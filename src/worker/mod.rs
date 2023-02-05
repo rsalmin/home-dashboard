@@ -1,6 +1,7 @@
 use crate::egui::Context; // b/c of re-export
 use std::sync::mpsc::{Sender, Receiver, RecvTimeoutError};
 use std::time::Duration;
+use log;
 
 use crate::interface::*;
 
@@ -9,16 +10,16 @@ pub fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand
   loop {
 
     match receiver.recv_timeout( Duration::from_secs(1) ) {
-      Ok( cmd ) => { println!("Got CMD: {:?}", cmd) },
+      Ok( cmd ) => { log::info!("Got CMD: {:?}", cmd) },
       Err( RecvTimeoutError::Disconnected ) => {
-        println!("Failed to receiver data, probably GUI is dead. Exiting...");
+        log::warn!("Failed to receiver data, probably GUI is dead. Exiting...");
         break;
       },
       _ => (),
     };
 
     if let Err( _ ) = sender.send(state.clone()) {
-      println!("Failed to send data, probably GUI is dead, exiting....");
+      log::warn!("Failed to send data, probably GUI is dead, exiting....");
       break;
     }
     ctx.request_repaint();

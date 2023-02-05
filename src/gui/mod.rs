@@ -2,6 +2,7 @@ use eframe::egui;
 use crate::egui::*;
 use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
 use std::thread;
+use log;
 
 use crate::interface::*;
 use crate::worker::worker_thread;
@@ -31,7 +32,7 @@ impl HomeDashboard {
 
   fn send_command(&self, cmd : HomeCommand) {
     if let Err( err ) = self.sender.send( cmd ) {
-      println!("Failed to send {:?} command. Ignoring.", err.0);
+      log::error!("Failed to send {:?} command. Ignoring.", err.0);
     }
   }
 }
@@ -42,7 +43,7 @@ impl eframe::App for HomeDashboard {
     match self.receiver.try_recv() {
       Ok( state ) => { self.state = state; },
       Err( TryRecvError::Disconnected ) => {
-        println!("Worker thread is dead. Closing...");
+        log::error!("Worker thread is dead. Closing...");
         frame.close();
       },
       _ => (),
