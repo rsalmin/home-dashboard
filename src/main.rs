@@ -1,6 +1,6 @@
 use eframe::egui;
 use egui::*;
-use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
+use std::sync::mpsc::{channel, Sender, Receiver, RecvTimeoutError, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
@@ -20,9 +20,9 @@ fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, c
   let mut state = HomeState::default();
   loop {
 
-    match receiver.try_recv() {
+    match receiver.recv_timeout( Duration::from_secs(1) ) {
       Ok( cmd ) => { println!("Got CMD: {:?}", cmd) },
-      Err( TryRecvError::Disconnected ) => {
+      Err( RecvTimeoutError::Disconnected ) => {
         println!("Failed to receiver data, probably GUI is dead. Exiting...");
         break;
       },
@@ -35,7 +35,6 @@ fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, c
     }
     ctx.request_repaint();
 
-    std::thread::sleep(  Duration::from_secs(1) );
     state.is_aeropex_connected = ! state.is_aeropex_connected;
   }
 }
@@ -56,7 +55,6 @@ struct MyEguiApp {
   state : HomeState,
   receiver : Receiver<HomeState>,
   sender : Sender<HomeCommand>,
-  worker_thread_handle : thread::JoinHandle<()>,
 }
 
 impl MyEguiApp {
@@ -66,13 +64,13 @@ impl MyEguiApp {
     let (gui_sender, worker_receiver) = channel::<HomeCommand>();
 
     let ctx = cc.egui_ctx.clone();
-    let handle = thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx));
+    // it detaches but we are control it via channels
+    thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx));
 
     MyEguiApp {
      state : HomeState::default(),
      receiver : gui_receiver,
      sender : gui_sender,
-     worker_thread_handle : handle
    }
   }
 
@@ -123,13 +121,6 @@ impl eframe::App for MyEguiApp {
       }
     });
   }
-
-  //fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-  //  if let Err(e) = self.worker_thread_handle.join() {
-  //    println!("Panic in woker thread!");
-  //    std::panic::resume_unwind(e);
-  //  }
-  //}
 
 }
 
