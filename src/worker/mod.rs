@@ -24,7 +24,7 @@ pub fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand
 
   loop {
 
-    match receiver.recv_timeout( Duration::from_secs(1) ) {
+    match receiver.recv_timeout( Duration::from_millis(300) ) {
       Ok( cmd ) => execute_command( &cfg, cmd ),
       Err( RecvTimeoutError::Disconnected ) => {
         log::warn!("Failed to receiver data, probably GUI is dead. Exiting...");
