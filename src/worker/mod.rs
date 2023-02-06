@@ -1,12 +1,15 @@
 use crate::egui::Context; // b/c of re-export
-use std::sync::mpsc::{Sender, Receiver, RecvTimeoutError};
-use std::time::Duration;
+use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc::error::TrySendError;
+use tokio::time::{sleep, Duration};
 use log;
 use std::process::Command;
 use std::str;
+use tokio;
 
 use crate::interface::*;
 
+#[derive(Clone)]
 struct Configuration {
   aeropex_id : String,
 }
@@ -17,41 +20,68 @@ impl Configuration {
  }
 }
 
-pub fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context) {
+#[tokio::main]
+pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context) {
 
   let cfg = Configuration::new();
+
+  let h1 = tokio::task::spawn( update_state_loop(sender, cfg.clone(), ctx) );
+  let h2 = tokio::task::spawn( execute_command_loop(receiver, cfg) );
+
+  if let Err( e ) = h1.await {
+    log::warn!("update_state_loop task is failed.... {:?}", e);
+  };
+  if let Err( e ) = h2.await {
+    log::warn!("execute_command_loop task is faield... {:?}", e);
+  }
+}
+
+async fn update_state_loop(sender : Sender<HomeState>, cfg : Configuration, ctx : Context)
+{
   let mut state = HomeState::default();
 
   loop {
+    match sender.try_send(state.clone()) {
+      Ok(()) => ctx.request_repaint(),
+      Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send data, GUI is not consuming it!"),
+      Err( TrySendError::Closed( _ ) ) => {
+        log::warn!("Failed to send data - channel is closed. Probably GUI is dead, exiting....");
+        break;
+      },
+    }
 
-    match receiver.recv_timeout( Duration::from_millis(300) ) {
-      Ok( cmd ) => execute_command( &cfg, cmd ),
-      Err( RecvTimeoutError::Disconnected ) => {
+    sleep(Duration::from_millis(333)).await;
+
+    state.is_aeropex_connected = check_bluetooth_status(&cfg);
+
+
+  }
+}
+
+async fn execute_command_loop(mut receiver : Receiver<HomeCommand>, cfg : Configuration)
+{
+  loop {
+      match receiver.recv().await {
+      Some( cmd ) => execute_command( &cfg, cmd ),
+      None => {
         log::warn!("Failed to receiver data, probably GUI is dead. Exiting...");
         break;
       },
-      _ => (),
-    };
+     };
 
-    if let Err( _ ) = sender.send(state.clone()) {
-      log::warn!("Failed to send data, probably GUI is dead, exiting....");
-      break;
-    }
-    ctx.request_repaint();
-
-    state.is_aeropex_connected = check_bluetooth_status(&cfg);
   }
 }
 
 fn execute_command(cfg : &Configuration, cmd : HomeCommand)
 {
   log::debug!("Got CMD: {:?}", cmd);
-  match cmd {
+  let out = match cmd {
     HomeCommand::ConnectAeropex =>
       execute_shell_command("bluetoothctl", &["connect", &cfg.aeropex_id]),
     HomeCommand::DisconnectAeropex =>
       execute_shell_command("bluetoothctl", &["disconnect", &cfg.aeropex_id]),
   };
+  log::debug!("CMD output: {}", out);
 }
 
 fn execute_shell_command(cmd : &str, args : &[&str]) -> String {

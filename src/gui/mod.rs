@@ -1,6 +1,7 @@
 use eframe::egui;
 use crate::egui::*;
-use std::sync::mpsc::{channel, Sender, Receiver, TryRecvError};
+use tokio::sync::mpsc::{channel, Sender, Receiver};
+use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
 use log;
 
@@ -16,8 +17,10 @@ pub struct HomeDashboard {
 impl HomeDashboard {
   pub fn new(cc : &eframe::CreationContext<'_>) -> Self {
 
-    let (worker_sender, gui_receiver) = channel::<HomeState>();
-    let (gui_sender, worker_receiver) = channel::<HomeCommand>();
+    const MAX_NUM_MESSAGES : usize = 10;
+
+    let (worker_sender, gui_receiver) = channel::<HomeState>(MAX_NUM_MESSAGES);
+    let (gui_sender, worker_receiver) = channel::<HomeCommand>(MAX_NUM_MESSAGES);
 
     let ctx = cc.egui_ctx.clone();
     // it detaches but we are control it via channels
@@ -31,8 +34,8 @@ impl HomeDashboard {
   }
 
   fn send_command(&self, cmd : HomeCommand) {
-    if let Err( err ) = self.sender.send( cmd ) {
-      log::error!("Failed to send {:?} command. Ignoring.", err.0);
+    if let Err( err ) = self.sender.try_send( cmd ) {
+      log::error!("Failed to send {:?} command. Ignoring.", err);
     }
   }
 }
