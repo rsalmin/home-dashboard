@@ -2,11 +2,10 @@ use crate::egui::Context; // b/c of re-export
 use tokio::sync::mpsc::{Sender, Receiver};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio::time::{sleep, Duration};
-use log;
-use std::process::Command;
-use std::str;
 use tokio;
-
+use log;
+use std::str::FromStr;
+use bluez_async::{MacAddress, DeviceId, BluetoothSession};
 use crate::interface::*;
 
 #[derive(Clone)]
@@ -24,9 +23,31 @@ impl Configuration {
 pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context) {
 
   let cfg = Configuration::new();
+  let aeropex_mac = MacAddress::from_str(&cfg.aeropex_id)
+                              .expect("MAC for aeropex in configuration is Incorrect! Programmer is morron!");
 
-  let h1 = tokio::task::spawn( update_state_loop(sender, cfg.clone(), ctx) );
-  let h2 = tokio::task::spawn( execute_command_loop(receiver, cfg) );
+  let bt_session = BluetoothSession::new().await;
+  if let Err( e ) = bt_session {
+    log::error!("Failed to open BluetoothSession : {:?} ; can't fulfill my duty. exiting....", e);
+    return;
+  }
+  let bt_session = bt_session.unwrap().1;
+
+  let devices = bt_session.get_devices().await;
+  if let Err( e ) = devices {
+       log::error!("Failed to get bluetooth device list : {:?}; nothing to do. exiting....", e);
+       return;
+  }
+  let devices = devices.unwrap();
+  let device = devices.into_iter().find(|device| device.mac_address == aeropex_mac);
+  if device.is_none() {
+      log::error!("Failed to find device with mac {:?}; nothing to do. exiting...", aeropex_mac);
+      return
+  }
+  let aeropex_id = device.unwrap().id;
+
+  let h1 = tokio::task::spawn( update_state_loop(sender, aeropex_id.clone(), ctx, bt_session.clone()) );
+  let h2 = tokio::task::spawn( execute_command_loop(receiver, aeropex_id, bt_session) );
 
   if let Err( e ) = h1.await {
     log::warn!("update_state_loop task is failed.... {:?}", e);
@@ -36,13 +57,17 @@ pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeC
   }
 }
 
-async fn update_state_loop(sender : Sender<HomeState>, cfg : Configuration, ctx : Context)
+async fn update_state_loop(
+  sender : Sender<HomeState>,
+  aeropex_id : DeviceId,
+  egui_ctx : Context,
+  bt_session : BluetoothSession )
 {
   let mut state = HomeState::default();
 
   loop {
     match sender.try_send(state.clone()) {
-      Ok(()) => ctx.request_repaint(),
+      Ok(()) => egui_ctx.request_repaint(),
       Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send data, GUI is not consuming it!"),
       Err( TrySendError::Closed( _ ) ) => {
         log::warn!("Failed to send data - channel is closed. Probably GUI is dead, exiting....");
@@ -50,19 +75,22 @@ async fn update_state_loop(sender : Sender<HomeState>, cfg : Configuration, ctx 
       },
     }
 
-    sleep(Duration::from_millis(333)).await;
+    sleep(Duration::from_millis(500)).await;
 
-    state.is_aeropex_connected = check_bluetooth_status(&cfg);
-
+    state.is_aeropex_connected = check_bluetooth_status(&aeropex_id, &bt_session).await;
 
   }
 }
 
-async fn execute_command_loop(mut receiver : Receiver<HomeCommand>, cfg : Configuration)
+async fn execute_command_loop(
+  mut receiver : Receiver<HomeCommand>,
+  aeropex_id : DeviceId,
+  bt_session : BluetoothSession
+  )
 {
   loop {
       match receiver.recv().await {
-      Some( cmd ) => execute_command( &cfg, cmd ),
+      Some( cmd ) => execute_command( &aeropex_id, &bt_session, cmd ).await,
       None => {
         log::warn!("Failed to receiver data, probably GUI is dead. Exiting...");
         break;
@@ -72,42 +100,30 @@ async fn execute_command_loop(mut receiver : Receiver<HomeCommand>, cfg : Config
   }
 }
 
-fn execute_command(cfg : &Configuration, cmd : HomeCommand)
+async fn execute_command(aeropex_id : &DeviceId, bt_session : &BluetoothSession, cmd : HomeCommand)
 {
   log::debug!("Got CMD: {:?}", cmd);
-  let out = match cmd {
-    HomeCommand::ConnectAeropex =>
-      execute_shell_command("bluetoothctl", &["connect", &cfg.aeropex_id]),
+  match cmd {
+    HomeCommand::ConnectAeropex => {
+      if let Err( e ) =  bt_session.connect(aeropex_id).await {
+        log::warn!("Error while connecting to {:?} : {:?}", aeropex_id, e);
+      }
+    },
     HomeCommand::DisconnectAeropex =>
-      execute_shell_command("bluetoothctl", &["disconnect", &cfg.aeropex_id]),
+      if let Err( e ) =  bt_session.disconnect(aeropex_id).await {
+        log::warn!("Error while disconnecting to {:?} : {:?}", aeropex_id, e);
+      }
   };
-  log::debug!("CMD output: {}", out);
 }
 
-fn execute_shell_command(cmd : &str, args : &[&str]) -> String {
-  let result = Command::new(cmd).args(args).output();
-  match result {
-    Err( e ) => { log::error!("Error executing command {} {:?} : {}", cmd, args, e); String::new() },
-    Ok( output ) => {
-      match str::from_utf8(&output.stdout) {
-        Ok( r ) => String::from(r) ,
-        Err( r ) => { log::error!("Invalid utf8 from shell command {} {:?}: {}", cmd, args, r); String::new() },
-      }
-    }
+async fn check_bluetooth_status(aeropex_id : &DeviceId, bt_session : &BluetoothSession) -> bool {
+
+  match bt_session.get_device_info(aeropex_id).await {
+    Err( e ) => {
+       log::warn!("Failed to get device info: {:?}", e);
+       false
+    },
+    Ok( info ) => info.connected,
   }
-}
 
-fn check_bluetooth_status(cfg : &Configuration) -> bool {
-  let output = execute_shell_command("bluetoothctl", &["devices", "Connected"]);
-
-  let mut is_connected = false;
-  for  s in output.lines()  {
-    if let Some( id ) = s.split_whitespace().nth(1) {
-      if id == cfg.aeropex_id {
-        is_connected = true;
-      }
-    }
-  };
-
-  is_connected
 }

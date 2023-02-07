@@ -10,5 +10,6 @@ eframe = "0.20.1"
 log = "0.4.17"
 env_logger = "0.10.0"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "sync", "time"] }
+bluez-async = "0.7"
 
 
