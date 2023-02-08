@@ -5,8 +5,9 @@ use tokio::time::{sleep, Duration};
 use tokio;
 use log;
 use std::str::FromStr;
-use bluez_async::{MacAddress, DeviceId, BluetoothSession};
+use bluez_async::{MacAddress, DeviceId, BluetoothSession, BluetoothEvent, DeviceEvent};
 use crate::interface::*;
+use futures::stream::StreamExt;
 
 #[derive(Clone)]
 struct Configuration {
@@ -64,8 +65,30 @@ async fn update_state_loop(
   bt_session : BluetoothSession )
 {
   let mut state = HomeState::default();
+  state.is_aeropex_connected = check_bluetooth_status(&aeropex_id, &bt_session).await;
+  match sender.try_send(state.clone()) {
+      Ok(()) => egui_ctx.request_repaint(),
+      Err( e ) => {
+         log::error!("Failed to send inital data {:?}. Probably GUI is dead, exiting....", e);
+         return;
+      },
+  };
 
-  loop {
+  let event_stream = bt_session.device_event_stream(&aeropex_id).await;
+  if let Err( e ) = event_stream {
+    log::error!("Failed to get device_event_stream for id {:?} : {:?}", aeropex_id, e);
+    return;
+  };
+  let mut event_stream = event_stream.unwrap();
+
+  while let Some( event ) = event_stream.next().await {
+
+    log::debug!("Got BT event {:?}", event);
+
+    if let BluetoothEvent::Device { event : DeviceEvent::Connected{ connected }, .. } = event {
+      state.is_aeropex_connected = connected;
+    }
+
     match sender.try_send(state.clone()) {
       Ok(()) => egui_ctx.request_repaint(),
       Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send data, GUI is not consuming it!"),
@@ -74,12 +97,9 @@ async fn update_state_loop(
         break;
       },
     }
-
-    sleep(Duration::from_millis(500)).await;
-
-    state.is_aeropex_connected = check_bluetooth_status(&aeropex_id, &bt_session).await;
-
   }
+
+  log::warn!("Event stream from BT is ended... strange... exitin...");
 }
 
 async fn execute_command_loop(

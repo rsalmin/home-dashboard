@@ -1086,6 +1086,7 @@ dependencies = [
  "bluez-async",
  "eframe",
  "env_logger",
+ "futures",
  "log",
  "tokio",
 ]
