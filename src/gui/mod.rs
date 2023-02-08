@@ -43,13 +43,17 @@ impl HomeDashboard {
 impl eframe::App for HomeDashboard {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 
-    match self.receiver.try_recv() {
-      Ok( state ) => { self.state = state; },
-      Err( TryRecvError::Disconnected ) => {
-        log::error!("Worker thread is dead. Closing...");
-        frame.close();
-      },
-      _ => (),
+    //only last message from channel is actual
+    loop {
+      match self.receiver.try_recv() {
+        Ok( state ) => { self.state = state; },
+        Err( TryRecvError::Disconnected ) => {
+          log::error!("Worker thread is dead. Closing...");
+          frame.close();
+          break;
+        },
+        _ => break,
+      };
     };
 
     egui::CentralPanel::default().show(ctx, |ui| {
