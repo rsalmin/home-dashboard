@@ -38,6 +38,7 @@ impl HomeDashboard {
       log::error!("Failed to send {:?} command. Ignoring.", err);
     }
   }
+
 }
 
 impl eframe::App for HomeDashboard {
@@ -56,7 +57,8 @@ impl eframe::App for HomeDashboard {
       };
     };
 
-    egui::CentralPanel::default().show(ctx, |ui| {
+//     egui::CentralPanel::default().show(ctx, |ui| {
+     egui::Window::new("my window").show(ctx, |ui| {
 
       let aeropex_state_string = if self.state.is_aeropex_connected {
           String::from("Connected")
@@ -64,22 +66,26 @@ impl eframe::App for HomeDashboard {
           String::from("Disconnected")
         };
 
-      ui.vertical_centered(|ui| {
-        ui.horizontal(|ui| {
-          ui.heading("Aeropex :");
-          ui.heading(aeropex_state_string);
-        });
-        ui.horizontal(|ui| {
-          if ui.button("Connect").clicked() {
-             self.send_command( HomeCommand::ConnectAeropex );
-          }
-          if ui.button("Disconnect").clicked() {
-             self.send_command( HomeCommand::DisconnectAeropex );
-          }
+      ui.vertical(|ui| {
+        ui.group(|ui| {
+          ui.vertical(|ui| {
+            ui.horizontal(|ui| {
+              ui.heading("Aeropex :");
+              ui.heading(aeropex_state_string);
+            });
+            ui.horizontal(|ui| {
+              if ui.button("Connect").clicked() {
+                 self.send_command( HomeCommand::ConnectAeropex );
+              }
+              if ui.button("Disconnect").clicked() {
+                self.send_command( HomeCommand::DisconnectAeropex );
+              }
+            });
+          });
         });
       });
 
-      if ui.ctx().input().key_pressed(Key::Q)   {
+      if ui.ctx().input( |i| i.key_pressed(Key::Q) )   {
         frame.close();
       }
     });

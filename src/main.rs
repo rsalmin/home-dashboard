@@ -13,9 +13,11 @@ fn main() {
   let mut native_options = eframe::NativeOptions::default();
   native_options.fullscreen = true;
 
-  eframe::run_native(
-    "Home Dashboard",
-    native_options,
-    Box::new(|cc| Box::new(HomeDashboard::new(cc)) )
-  );
+  if let Err( e ) = eframe::run_native(
+      "Home Dashboard",
+      native_options,
+      Box::new(|cc| Box::new(HomeDashboard::new(cc)) )
+    )  {
+    log::error!("Failed to run Home Dashboard {:?}", e);
+  };
 }
