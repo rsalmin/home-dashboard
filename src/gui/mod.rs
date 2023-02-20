@@ -57,8 +57,8 @@ impl eframe::App for HomeDashboard {
       };
     };
 
-//     egui::CentralPanel::default().show(ctx, |ui| {
-     egui::Window::new("my window").show(ctx, |ui| {
+    let Vec2 {x : frame_width, y : frame_height} = ctx.screen_rect().size();
+     egui::CentralPanel::default().show(ctx, |ui| {
 
       let aeropex_state_string = if self.state.is_aeropex_connected {
           String::from("Connected")
@@ -66,23 +66,31 @@ impl eframe::App for HomeDashboard {
           String::from("Disconnected")
         };
 
-      ui.vertical(|ui| {
-        ui.group(|ui| {
-          ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-              ui.heading("Aeropex :");
-              ui.heading(aeropex_state_string);
-            });
-            ui.horizontal(|ui| {
-              if ui.button("Connect").clicked() {
-                 self.send_command( HomeCommand::ConnectAeropex );
-              }
-              if ui.button("Disconnect").clicked() {
-                self.send_command( HomeCommand::DisconnectAeropex );
-              }
+     Grid::new("unique grid")
+       .min_col_width(frame_width / 3.0)
+       .min_row_height(frame_height / 3.0)
+       .num_columns(3)
+       .show(ui, |ui| {
+         ui.end_row();
+         ui.add_visible(false, Separator::default());
+         ui.group(|ui| {
+            ui.vertical(|ui| {
+              ui.horizontal(|ui| {
+                ui.heading("Aeropex :");
+                ui.heading(aeropex_state_string);
+              });
+              ui.horizontal(|ui| {
+                if ui.button("Connect").clicked() {
+                  self.send_command( HomeCommand::ConnectAeropex );
+                }
+                if ui.button("Disconnect").clicked() {
+                  self.send_command( HomeCommand::DisconnectAeropex );
+                }
+              });
             });
           });
-        });
+         ui.end_row();
+         ui.end_row();
       });
 
       if ui.ctx().input( |i| i.key_pressed(Key::Q) )   {
