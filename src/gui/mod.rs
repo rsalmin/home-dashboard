@@ -1,5 +1,6 @@
 use eframe::egui;
 use crate::egui::*;
+use crate::egui::widget_text::RichText;
 use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
@@ -8,8 +9,14 @@ use log;
 use crate::interface::*;
 use crate::worker::worker_thread;
 
+#[derive(Default)]
+pub struct GUIState {
+  aeropex_switch_state : bool,
+}
+
 pub struct HomeDashboard {
   state : HomeState,
+  gui_state : GUIState,
   receiver : Receiver<HomeState>,
   sender : Sender<HomeCommand>,
 }
@@ -23,11 +30,17 @@ impl HomeDashboard {
     let (gui_sender, worker_receiver) = channel::<HomeCommand>(MAX_NUM_MESSAGES);
 
     let ctx = cc.egui_ctx.clone();
+
+    let mut style = (*ctx.style()).clone();
+    style.visuals.selection.bg_fill = Color32::DARK_GREEN;
+    ctx.set_style(style);
+
     // it detaches but we are control it via channels
     thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx));
 
     HomeDashboard {
      state : HomeState::default(),
+     gui_state : GUIState::default(),
      receiver : gui_receiver,
      sender : gui_sender,
    }
@@ -45,25 +58,33 @@ impl eframe::App for HomeDashboard {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 
     //only last message from channel is actual
+    let mut new_state : Option<HomeState> = None;
     loop {
       match self.receiver.try_recv() {
-        Ok( state ) => { self.state = state; },
+        Ok( state ) => { new_state = Some( state ); },
         Err( TryRecvError::Disconnected ) => {
           log::error!("Worker thread is dead. Closing...");
           frame.close();
           break;
         },
         _ => break,
-      };
-    };
+      }
+    }
+
+    if let Some( new_state ) = new_state {
+      if  self.state.is_aeropex_connected != new_state.is_aeropex_connected {
+        self.gui_state.aeropex_switch_state = new_state.is_aeropex_connected;
+      }
+      self.state = new_state;
+    }
 
     let Vec2 {x : frame_width, y : frame_height} = ctx.screen_rect().size();
      egui::CentralPanel::default().show(ctx, |ui| {
 
-      let aeropex_state_string = if self.state.is_aeropex_connected {
-          String::from("Connected")
+      let aeropex_state_text = if self.state.is_aeropex_connected {
+          RichText::new("Connected").heading().color(Color32::GREEN)
         } else {
-          String::from("Disconnected")
+          RichText::new("Disconnected").heading()
         };
 
      Grid::new("unique grid")
@@ -74,19 +95,16 @@ impl eframe::App for HomeDashboard {
          ui.end_row();
          ui.add_visible(false, Separator::default());
          ui.group(|ui| {
-            ui.vertical(|ui| {
-              ui.horizontal(|ui| {
-                ui.heading("Aeropex :");
-                ui.heading(aeropex_state_string);
-              });
-              ui.horizontal(|ui| {
-                if ui.button("Connect").clicked() {
-                  self.send_command( HomeCommand::ConnectAeropex );
-                }
-                if ui.button("Disconnect").clicked() {
-                  self.send_command( HomeCommand::DisconnectAeropex );
-                }
-              });
+            ui.vertical_centered(|ui| {
+              ui.heading("Aeropex");
+              ui.label( aeropex_state_text );
+             if switch_button(ui, &mut self.gui_state.aeropex_switch_state).clicked() {
+               if self.gui_state.aeropex_switch_state {
+                 self.send_command( HomeCommand::ConnectAeropex );
+               } else {
+                 self.send_command( HomeCommand::DisconnectAeropex );
+               }
+             }
             });
           });
          ui.end_row();
@@ -101,3 +119,31 @@ impl eframe::App for HomeDashboard {
 
 }
 
+fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
+    let desired_size = ui.spacing().interact_size.y * egui::vec2(1.0, 2.5);
+    let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+    if response.clicked() {
+        *on = !*on;
+        response.mark_changed();
+    }
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, *on, ""));
+
+    if ui.is_rect_visible(rect) {
+        let how_on = ui.ctx().animate_bool(response.id, *on);
+        let visuals = ui.style().visuals.widgets.style(&response);
+        let rect = rect.expand(visuals.expansion);
+        let radius = 0.5 * rect.width();
+        ui.painter()
+            .rect(rect, radius, visuals.bg_fill, visuals.bg_stroke);
+        let circle_y = egui::lerp((rect.bottom() - radius)..=(rect.top() + radius), how_on);
+        let center = egui::pos2(rect.center().x, circle_y);
+
+        let bg_c = Color32::GRAY;
+        let mut stroke = visuals.fg_stroke.clone();
+        stroke.color = bg_c;
+        ui.painter()
+            .circle(center, 0.85 * radius, bg_c, stroke);
+    }
+
+    response
+}
