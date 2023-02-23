@@ -30,7 +30,7 @@
 
           installFlags = [ "PREFIX=$(out)" ];
 
-          buildInputs = with pkgs; [ gtk3 plan9port ];
+          buildInputs = with pkgs; [ gtk3 plan9port glfw ];
     };
 
     packages.x86_64-linux.default = self.packages.x86_64-linux.home-dashboard;
