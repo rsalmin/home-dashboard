@@ -12,6 +12,7 @@ use crate::worker::worker_thread;
 #[derive(Default)]
 pub struct GUIState {
   aeropex_switch_state : bool,
+  edifier_switch_state : bool,
 }
 
 pub struct HomeDashboard {
@@ -52,6 +53,38 @@ impl HomeDashboard {
     }
   }
 
+  fn bt_group(&self,
+    ui: &mut Ui,
+    label : &str,
+    connect_state : bool,
+    switch_state : bool,
+    connect_command : HomeCommand,
+    disconnect_command : HomeCommand) -> bool {
+
+      let aeropex_state_text = if connect_state {
+            RichText::new("Connected").heading().color(Color32::GREEN)
+          } else {
+            RichText::new("Disconnected").heading()
+      };
+
+      let mut switch_state = switch_state;
+
+      ui.group(|ui| {
+        ui.vertical_centered(|ui| {
+          ui.heading(label);
+          ui.label( aeropex_state_text );
+          if switch_button(ui, &mut switch_state).clicked() {
+            if switch_state {
+              self.send_command( connect_command );
+            } else {
+              self.send_command( disconnect_command );
+            }
+          }
+        });
+      });
+
+     switch_state
+  }
 }
 
 impl eframe::App for HomeDashboard {
@@ -75,38 +108,39 @@ impl eframe::App for HomeDashboard {
       if  self.state.is_aeropex_connected != new_state.is_aeropex_connected {
         self.gui_state.aeropex_switch_state = new_state.is_aeropex_connected;
       }
+      if  self.state.is_edifier_connected != new_state.is_edifier_connected {
+        self.gui_state.edifier_switch_state = new_state.is_edifier_connected;
+      }
       self.state = new_state;
     }
 
     let Vec2 {x : frame_width, y : frame_height} = ctx.screen_rect().size();
-     egui::CentralPanel::default().show(ctx, |ui| {
-
-      let aeropex_state_text = if self.state.is_aeropex_connected {
-          RichText::new("Connected").heading().color(Color32::GREEN)
-        } else {
-          RichText::new("Disconnected").heading()
-        };
-
-     Grid::new("unique grid")
-       .min_col_width(frame_width / 3.0)
+    egui::CentralPanel::default().show(ctx, |ui| {
+      Grid::new("unique grid")
+       .min_col_width(frame_width / 6.0)
        .min_row_height(frame_height / 3.0)
-       .num_columns(3)
+       .num_columns(6)
        .show(ui, |ui| {
          ui.end_row();
          ui.add_visible(false, Separator::default());
-         ui.group(|ui| {
-            ui.vertical_centered(|ui| {
-              ui.heading("Aeropex");
-              ui.label( aeropex_state_text );
-             if switch_button(ui, &mut self.gui_state.aeropex_switch_state).clicked() {
-               if self.gui_state.aeropex_switch_state {
-                 self.send_command( HomeCommand::ConnectAeropex );
-               } else {
-                 self.send_command( HomeCommand::DisconnectAeropex );
-               }
-             }
-            });
-          });
+         ui.add_visible(false, Separator::default());
+
+         let new_switch_state = self.bt_group(ui, "Aeropex",
+           self.state.is_aeropex_connected,
+           self.gui_state.aeropex_switch_state,
+           HomeCommand::ConnectAeropex,
+           HomeCommand::DisconnectAeropex,
+         );
+         self.gui_state.aeropex_switch_state = new_switch_state;
+
+         let new_switch_state = self.bt_group(ui, "Edifier",
+           self.state.is_edifier_connected,
+           self.gui_state.edifier_switch_state,
+           HomeCommand::ConnectEdifier,
+           HomeCommand::DisconnectEdifier,
+         );
+         self.gui_state.edifier_switch_state = new_switch_state;
+
          ui.end_row();
          ui.end_row();
       });
