@@ -20,8 +20,8 @@
 
           nativeBuildInputs = with pkgs; [
              rust-bin.stable.latest.minimal
-             dbus
              pkg-config
+             plan9port
           ];
 
           cargoLock = {
@@ -30,8 +30,10 @@
 
           installFlags = [ "PREFIX=$(out)" ];
 
-          buildInputs = with pkgs; [ gtk3 plan9port glfw ];
-    };
+          buildInputs = with pkgs; [ libglvnd dbus gtk3];
+
+          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.libglvnd ];
+ };
 
     packages.x86_64-linux.default = self.packages.x86_64-linux.home-dashboard;
   };
