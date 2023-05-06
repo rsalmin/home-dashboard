@@ -2,4 +2,10 @@
 
 members = [
     "home-dashboard",
+    "netatmo-connect",
 ]
+
+default-members = [
+    "home-dashboard",
+]
+
