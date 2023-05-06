@@ -10,34 +10,17 @@ use futures::stream::StreamExt;
 mod bluetooth;
 use bluetooth::*;
 
-#[derive(Clone)]
-struct Configuration {
-  aeropex_id : String,
-  edifier_id : String,
-}
-
-impl Configuration {
- fn new() -> Self {
-   Configuration {
-     aeropex_id : String::from("20:74:CF:BD:61:41"),
-     edifier_id : String::from("0C:AE:BD:6D:95:0D"),
-   }
- }
-}
-
 #[tokio::main]
-pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context) {
-  let result = worker_thread_prime(sender, receiver, ctx).await;
+pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context, cfg : HomeDashboardConfig) {
+  let result = worker_thread_prime(sender, receiver, ctx, cfg).await;
   if let Err ( e ) = result {
     log::error!("Error in worker_thread : {}. exiting....", e);
   }
 }
 
-pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context) -> Result<(), String> {
+pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context, cfg : HomeDashboardConfig) -> Result<(), String> {
 
-  let cfg = Configuration::new();
-
-  let bt_module = BluetoothModule::new(&cfg.aeropex_id, &cfg.edifier_id).await?;
+  let bt_module = BluetoothModule::new(&cfg.bt_config).await?;
 
   let h1 = tokio::task::spawn( update_state_loop(sender, bt_module.clone(), ctx) );
   let h2 = tokio::task::spawn( execute_command_loop(receiver, bt_module) );

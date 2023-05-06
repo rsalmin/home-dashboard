@@ -12,7 +12,7 @@ pub struct BluetoothModule {
 }
 
 impl BluetoothModule {
-  pub async fn new(aeropex_mac : &str, edifier_mac : &str) -> Result<Self, String> {
+  pub async fn new(bt_config : &BluetoothConfig) -> Result<Self, String> {
 
       let session = BluetoothSession::new().await;
       if let Err( e ) = session {
@@ -26,8 +26,8 @@ impl BluetoothModule {
       }
       let devices = devices.unwrap();
 
-      let aeropex_id = find_device_id(&devices, aeropex_mac)?;
-      let edifier_id = find_device_id(&devices, edifier_mac)?;
+      let aeropex_id = find_device_id(&devices, &bt_config.aeropex_mac)?;
+      let edifier_id = find_device_id(&devices, &bt_config.edifier_mac)?;
 
       Ok( BluetoothModule { session, aeropex_id, edifier_id } )
   }

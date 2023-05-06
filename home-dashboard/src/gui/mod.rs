@@ -23,7 +23,7 @@ pub struct HomeDashboard {
 }
 
 impl HomeDashboard {
-  pub fn new(cc : &eframe::CreationContext<'_>) -> Self {
+  pub fn new(cc : &eframe::CreationContext<'_>, cfg : HomeDashboardConfig) -> Self {
 
     const MAX_NUM_MESSAGES : usize = 10;
 
@@ -37,7 +37,7 @@ impl HomeDashboard {
     ctx.set_style(style);
 
     // it detaches but we are control it via channels
-    thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx));
+    thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx, cfg));
 
     HomeDashboard {
      state : HomeState::default(),

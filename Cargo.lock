@@ -1323,11 +1323,13 @@ name = "home-dashboard"
 version = "0.1.0"
 dependencies = [
  "bluez-async",
+ "confy",
  "eframe",
  "env_logger",
  "futures",
  "log",
  "netatmo-connect",
+ "serde",
  "tokio",
 ]
 
