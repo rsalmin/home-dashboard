@@ -1,0 +1,3 @@
+[submodule "netatmo-connect"]
+	path = netatmo-connect
+	url = git@github.com:rsalmin/netatmo-connect.git
