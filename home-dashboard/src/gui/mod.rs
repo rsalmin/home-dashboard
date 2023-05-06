@@ -105,11 +105,11 @@ impl eframe::App for HomeDashboard {
     }
 
     if let Some( new_state ) = new_state {
-      if  self.state.is_aeropex_connected != new_state.is_aeropex_connected {
-        self.gui_state.aeropex_switch_state = new_state.is_aeropex_connected;
+      if  self.state.bt_state.is_aeropex_connected != new_state.bt_state.is_aeropex_connected {
+        self.gui_state.aeropex_switch_state = new_state.bt_state.is_aeropex_connected;
       }
-      if  self.state.is_edifier_connected != new_state.is_edifier_connected {
-        self.gui_state.edifier_switch_state = new_state.is_edifier_connected;
+      if  self.state.bt_state.is_edifier_connected != new_state.bt_state.is_edifier_connected {
+        self.gui_state.edifier_switch_state = new_state.bt_state.is_edifier_connected;
       }
       self.state = new_state;
     }
@@ -126,7 +126,7 @@ impl eframe::App for HomeDashboard {
          ui.add_visible(false, Separator::default());
 
          let new_switch_state = self.bt_group(ui, "Aeropex",
-           self.state.is_aeropex_connected,
+           self.state.bt_state.is_aeropex_connected,
            self.gui_state.aeropex_switch_state,
            HomeCommand::ConnectAeropex,
            HomeCommand::DisconnectAeropex,
@@ -134,7 +134,7 @@ impl eframe::App for HomeDashboard {
          self.gui_state.aeropex_switch_state = new_switch_state;
 
          let new_switch_state = self.bt_group(ui, "Edifier",
-           self.state.is_edifier_connected,
+           self.state.bt_state.is_edifier_connected,
            self.gui_state.edifier_switch_state,
            HomeCommand::ConnectEdifier,
            HomeCommand::DisconnectEdifier,
