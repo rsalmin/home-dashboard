@@ -1,14 +1,14 @@
 use crate::egui::Context; // b/c of re-export
-use tokio::sync::mpsc::{Sender, Receiver};
+use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TrySendError;
 use tokio;
 use log;
-use bluez_async::{BluetoothEvent, DeviceEvent};
 use crate::interface::*;
-use futures::stream::StreamExt;
 
 mod bluetooth;
+mod netatmo;
 use bluetooth::*;
+use netatmo::*;
 
 #[tokio::main]
 pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context, cfg : HomeDashboardConfig) {
@@ -22,8 +22,14 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
 
   let bt_module = BluetoothModule::new(&cfg.bt_config).await?;
 
-  let h1 = tokio::task::spawn( update_state_loop(sender, bt_module.clone(), ctx) );
+  const MAX_NUM_MESSAGES : usize = 5;
+  let (bt_sender, bt_receiver) = channel::<BluetoothState>(MAX_NUM_MESSAGES);
+  let (netatmo_sender, netatmo_receiver) = channel::<WeatherData>(MAX_NUM_MESSAGES);
+
+  let h1 = tokio::task::spawn( update_state_loop(sender, bt_receiver, netatmo_receiver, ctx) );
+  let h3 = tokio::task::spawn( watch_bluetooth_loop(bt_module.clone(), bt_sender) );
   let h2 = tokio::task::spawn( execute_command_loop(receiver, bt_module) );
+  let h4 = tokio::task::spawn ( watch_netatmo_loop(netatmo_sender, cfg.connect_config.clone()) );
 
   match h1.await {
     Err( e ) => log::warn!("update_state_loop task is faield... {:?}", e),
@@ -32,43 +38,25 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
   if let Err( e ) = h2.await {
     log::warn!("execute_command_loop task is faield... {:?}", e);
   }
+  if let Err( e ) = h3.await {
+    log::warn!("watch_bluetooth_loop task is faield... {:?}", e);
+  }
+  if let Err( e ) = h4.await {
+    log::warn!("watch_netatmo_loop task is faield... {:?}", e);
+  }
 
   Ok(())
 }
 
 async fn update_state_loop(
   sender : Sender<HomeState>,
-  bt_module : BluetoothModule,
+  mut bt_receiver : Receiver<BluetoothState>,
+  mut netatmo_receiver : Receiver<WeatherData>,
   egui_ctx : Context) -> Result<(), String>
 {
   let mut state = HomeState::default();
 
-  state.bt_state = bt_module.get_state().await;
-
-  sender.try_send(state.clone()).map_err(|x| x.to_string())?;
-  egui_ctx.request_repaint();
-
-  //FIXME: if devices switched it's state between initial state request and event_stream loop, we will have a problem
-  let mut aeropex_event_stream = bt_module.aeropex_event_stream().await?;
-  let mut edifier_event_stream = bt_module.edifier_event_stream().await?;
-
   loop {
-    tokio::select! {
-      Some( event ) = aeropex_event_stream.next() => {
-        log::debug!("Got BT event {:?}", event);
-        if let BluetoothEvent::Device { event : DeviceEvent::Connected{ connected }, .. } = event {
-          state.bt_state.is_aeropex_connected = connected;
-        }
-      }
-      Some( event ) = edifier_event_stream.next() => {
-        log::debug!("Got BT event {:?}", event);
-        if let BluetoothEvent::Device { event : DeviceEvent::Connected{ connected }, .. } = event {
-          state.bt_state.is_edifier_connected = connected;
-        }
-      }
-      else => { break; }
-    }
-
     match sender.try_send(state.clone()) {
       Ok(()) => egui_ctx.request_repaint(),
       Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send data, GUI is not consuming it!"),
@@ -78,10 +66,20 @@ async fn update_state_loop(
       },
     }
 
+    tokio::select! {
+      Some( bt_state ) = bt_receiver.recv() => {
+          state.bt_state = bt_state;
+      }
+      Some( weather_data ) = netatmo_receiver.recv() => {
+          state.weather_data = weather_data;
+      }
+     else => { break; }
+    }
+
   }
 
 
-  log::warn!("Event stream from BT is ended... strange... exiting...");
+  log::warn!("One of data streams is ended... strange... exiting...");
   Ok(())
 }
 
