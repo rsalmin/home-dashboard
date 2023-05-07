@@ -9,6 +9,7 @@ mod bluetooth;
 mod netatmo;
 use bluetooth::*;
 use netatmo::*;
+use std::option::Option;
 
 #[tokio::main]
 pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context, cfg : HomeDashboardConfig) {
@@ -24,7 +25,7 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
 
   const MAX_NUM_MESSAGES : usize = 5;
   let (bt_sender, bt_receiver) = channel::<BluetoothState>(MAX_NUM_MESSAGES);
-  let (netatmo_sender, netatmo_receiver) = channel::<WeatherData>(MAX_NUM_MESSAGES);
+  let (netatmo_sender, netatmo_receiver) = channel::<Option<WeatherData>>(MAX_NUM_MESSAGES);
 
   let h1 = tokio::task::spawn( update_state_loop(sender, bt_receiver, netatmo_receiver, ctx) );
   let h3 = tokio::task::spawn( watch_bluetooth_loop(bt_module.clone(), bt_sender) );
@@ -51,7 +52,7 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
 async fn update_state_loop(
   sender : Sender<HomeState>,
   mut bt_receiver : Receiver<BluetoothState>,
-  mut netatmo_receiver : Receiver<WeatherData>,
+  mut netatmo_receiver : Receiver<Option<WeatherData>>,
   egui_ctx : Context) -> Result<(), String>
 {
   let mut state = HomeState::default();
@@ -70,8 +71,8 @@ async fn update_state_loop(
       Some( bt_state ) = bt_receiver.recv() => {
           state.bt_state = bt_state;
       }
-      Some( weather_data ) = netatmo_receiver.recv() => {
-          state.weather_data = weather_data;
+      Some( weather_data_opt ) = netatmo_receiver.recv() => {
+          state.weather_data = weather_data_opt;
       }
      else => { break; }
     }

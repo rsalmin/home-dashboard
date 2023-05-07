@@ -94,7 +94,7 @@ impl eframe::App for HomeDashboard {
     let mut new_state : Option<HomeState> = None;
     loop {
       match self.receiver.try_recv() {
-        Ok( state ) => { new_state = Some( state ); },
+        Ok( state ) => { new_state = Some( state ); log::debug!("recv: {:?}", new_state); },
         Err( TryRecvError::Disconnected ) => {
           log::error!("Worker thread is dead. Closing...");
           frame.close();
