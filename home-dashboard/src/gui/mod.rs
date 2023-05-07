@@ -85,6 +85,69 @@ impl HomeDashboard {
 
      switch_state
   }
+
+  fn outdoor_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
+     let mut text1 = String::new();
+     let mut text2 = String::new();
+     let mut text3 = String::new();
+
+     if let Some( wd ) = wd {
+         let pressure = wd.pressure / 1.333223684; //to mmHg
+         text2 = format!("{:.1} mmHg {}", pressure, show_trend(&wd.pressure_trend));
+
+         if let Some( od ) = &wd.outdoor_weather {
+             text1 = format!("{:.1} °C {}     {} %", od.temperature, show_trend(&od.temperature_trend), od.humidity);
+             text3 = format!("battery: {}%", od.battery);
+         }
+     }
+
+      let rich_text1= RichText::new(text1).heading().color(Color32::GREEN).size(50.0);
+      let rich_text2= RichText::new(text2).heading().color(Color32::GREEN).size(50.0);
+      let rich_text3= RichText::new(text3).heading().color(Color32::GREEN).size(10.0);
+
+      ui.group(|ui| {
+        ui.vertical_centered(|ui| {
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.label( rich_text1 );
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.label( rich_text2 );
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.label( rich_text3 );
+        })
+      });
+  }
+
+  fn home_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
+     let mut text1 = String::new();
+     let mut text2 = String::new();
+
+     if let Some( wd ) = wd {
+             text1 = format!("{:.1} °C      {} %", wd.room_temperature,  wd.room_humidity);
+             text2 = format!("{} ppm  {} dB", wd.room_co2,  wd.room_noise);
+     }
+
+      let rich_text1= RichText::new(text1).heading().color(Color32::GREEN).size(50.0);
+      let rich_text2= RichText::new(text2).heading().color(Color32::GREEN).size(50.0);
+
+      ui.group(|ui| {
+        ui.vertical_centered(|ui| {
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.label( rich_text1 );
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.add_visible(false, Separator::default());
+          ui.label( rich_text2 );
+        })
+      });
+  }
 }
 
 impl eframe::App for HomeDashboard {
@@ -94,7 +157,7 @@ impl eframe::App for HomeDashboard {
     let mut new_state : Option<HomeState> = None;
     loop {
       match self.receiver.try_recv() {
-        Ok( state ) => { new_state = Some( state ); log::debug!("recv: {:?}", new_state); },
+        Ok( state ) => { new_state = Some( state ); },
         Err( TryRecvError::Disconnected ) => {
           log::error!("Worker thread is dead. Closing...");
           frame.close();
@@ -123,6 +186,7 @@ impl eframe::App for HomeDashboard {
        .show(ui, |ui| {
          ui.end_row();
          ui.add_visible(false, Separator::default());
+         self.home_group(ui, &self.state.weather_data);
          ui.add_visible(false, Separator::default());
 
          let new_switch_state = self.bt_group(ui, "Aeropex",
@@ -142,6 +206,10 @@ impl eframe::App for HomeDashboard {
          self.gui_state.edifier_switch_state = new_switch_state;
 
          ui.end_row();
+         for _ in 1..5 {
+             ui.add_visible(false, Separator::default());
+         }
+         self.outdoor_group(ui, &self.state.weather_data);
          ui.end_row();
       });
 
@@ -180,4 +248,18 @@ fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
     }
 
     response
+}
+
+
+fn show_trend(t : &Option<Trend>) -> String
+{
+  match t {
+       None => String::from("(?)"),
+       Some( t ) =>
+           match t {
+               Trend::Stable => String::from("="),
+               Trend::Up => String::from("/|\\"),
+               Trend::Down => String::from("\\|/"),
+           },
+  }
 }
