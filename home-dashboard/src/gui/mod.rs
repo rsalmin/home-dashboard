@@ -87,64 +87,59 @@ impl HomeDashboard {
   }
 
   fn outdoor_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-     let mut text1 = String::new();
-     let mut text2 = String::new();
-     let mut text3 = String::new();
+     let mut texts = Vec::<String>::new();
+     let mut bat_text = String::new();
 
      if let Some( wd ) = wd {
-         let pressure = wd.pressure / 1.333223684; //to mmHg
-         text2 = format!("{:.1} mmHg {}", pressure, show_trend(&wd.pressure_trend));
 
          if let Some( od ) = &wd.outdoor_weather {
-             text1 = format!("{:.1} °C {}     {} %", od.temperature, show_trend(&od.temperature_trend), od.humidity);
-             text3 = format!("battery: {}%", od.battery);
+             texts.push(format!("{:.1} °C {}", od.temperature, show_trend(&od.temperature_trend)));
+             texts.push(format!("{} %", od.humidity));
+             bat_text = format!("battery: {}%", od.battery);
          }
+
+         let pressure = wd.pressure / 1.333223684; //to mmHg
+         texts.push(format!("{:.1} mmHg {}", pressure, show_trend(&wd.pressure_trend)));
+
+
      }
 
-      let rich_text1= RichText::new(text1).heading().color(Color32::GREEN).size(50.0);
-      let rich_text2= RichText::new(text2).heading().color(Color32::GREEN).size(50.0);
-      let rich_text3= RichText::new(text3).heading().color(Color32::GREEN).size(10.0);
+      let rich_texts : Vec::<RichText> = texts.iter().map(|t| RichText::new(t).heading().color(Color32::GREEN).size(40.0)).collect();
 
       ui.group(|ui| {
         ui.vertical_centered(|ui| {
+          for rt in rich_texts {
+            ui.add_visible(false, Separator::default());
+            ui.add_visible(false, Separator::default());
+            ui.add_visible(false, Separator::default());
+            ui.label( rt );
+          }
           ui.add_visible(false, Separator::default());
           ui.add_visible(false, Separator::default());
           ui.add_visible(false, Separator::default());
-          ui.label( rich_text1 );
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.label( rich_text2 );
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.label( rich_text3 );
+          ui.label( bat_text );
         })
       });
   }
 
   fn home_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-     let mut text1 = String::new();
-     let mut text2 = String::new();
+     let mut texts = Vec::<String>::new();
 
      if let Some( wd ) = wd {
-             text1 = format!("{:.1} °C      {} %", wd.room_temperature,  wd.room_humidity);
-             text2 = format!("{} ppm  {} dB", wd.room_co2,  wd.room_noise);
+             texts.push( format!("{:.1} °C", wd.room_temperature) );
+             texts.push( format!("{} %", wd.room_humidity) );
+             texts.push( format!("{} ppm", wd.room_co2) );
+             texts.push( format!("{} dB", wd.room_noise) );
      }
-
-      let rich_text1= RichText::new(text1).heading().color(Color32::GREEN).size(50.0);
-      let rich_text2= RichText::new(text2).heading().color(Color32::GREEN).size(50.0);
 
       ui.group(|ui| {
         ui.vertical_centered(|ui| {
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.label( rich_text1 );
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.label( rich_text2 );
+          for txt in texts {
+            ui.add_visible(false, Separator::default());
+            ui.add_visible(false, Separator::default());
+            ui.add_visible(false, Separator::default());
+            ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
+          }
         })
       });
   }
@@ -157,7 +152,10 @@ impl eframe::App for HomeDashboard {
     let mut new_state : Option<HomeState> = None;
     loop {
       match self.receiver.try_recv() {
-        Ok( state ) => { new_state = Some( state ); },
+        Ok( state ) => {
+            new_state = Some( state );
+            log::debug!("recv: {:?}", new_state);
+         },
         Err( TryRecvError::Disconnected ) => {
           log::error!("Worker thread is dead. Closing...");
           frame.close();
@@ -184,6 +182,7 @@ impl eframe::App for HomeDashboard {
        .min_row_height(frame_height / 3.0)
        .num_columns(6)
        .show(ui, |ui| {
+         log::debug!("heading text height: {}", ui.text_style_height(&TextStyle::Heading));
          ui.end_row();
          ui.add_visible(false, Separator::default());
          self.home_group(ui, &self.state.weather_data);
