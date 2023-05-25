@@ -148,6 +148,10 @@ impl HomeDashboard {
 impl eframe::App for HomeDashboard {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 
+    log::debug!("screen_rect {:?}", ctx.screen_rect());
+    log::debug!("available_rect {:?}", ctx.available_rect());
+    log::debug!("pixels_per_point {}", ctx.pixels_per_point());
+
     //only last message from channel is actual
     let mut new_state : Option<HomeState> = None;
     loop {
@@ -182,7 +186,6 @@ impl eframe::App for HomeDashboard {
        .min_row_height(frame_height / 3.0)
        .num_columns(6)
        .show(ui, |ui| {
-         log::debug!("heading text height: {}", ui.text_style_height(&TextStyle::Heading));
          ui.end_row();
          ui.add_visible(false, Separator::default());
          self.home_group(ui, &self.state.weather_data);
