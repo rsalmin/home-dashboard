@@ -95,39 +95,57 @@ impl HomeDashboard {
      switch_state
   }
 
-  fn outdoor_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-     let mut texts = Vec::<String>::new();
-     let mut bat_text = String::new();
+  fn outdoor_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
+    let name_texts = vec!["Temperature    ", "Humidity", "Pressure ", "battery"];
+    let unit_texts = vec!["°C", "%", "mmHg", "%"];
+    let text_colors = vec![Color32::GREEN, Color32::GREEN, Color32::GREEN, Color32::GRAY];
+    let text_sizes = vec![40.0, 40.0, 40.0, 20.0];
 
-     if let Some( wd ) = wd {
+    let mut data_texts = vec![String::new(); 4];
+    let mut data_trend_texts = vec![String::new(); 4];
 
-         if let Some( od ) = &wd.outdoor_weather {
-             texts.push(format!("{:.1} °C {}", od.temperature, show_trend(&od.temperature_trend)));
-             texts.push(format!("{} %", od.humidity));
-             bat_text = format!("battery: {}%", od.battery);
-         }
+    if let Some( wd ) = wd {
 
-         let pressure = wd.pressure / 1.333223684; //to mmHg
-         texts.push(format!("{:.1} mmHg {}", pressure, show_trend(&wd.pressure_trend)));
+        if let Some( od ) = &wd.outdoor_weather {
+            data_texts[0] = format!("{:.1}", od.temperature);
+            data_trend_texts[0] = show_trend(&od.temperature_trend);
+            data_texts[1] = format!("{}", od.humidity);
+            data_texts[3] = format!("{}", od.battery);
+        }
 
+        let pressure = wd.pressure / 1.333223684; //to mmHg
+        data_texts[2] = format!("{:.1}", pressure);
+        data_trend_texts[2] =  show_trend(&wd.pressure_trend);
+    }
 
-     }
-
-      let rich_texts : Vec::<RichText> = texts.iter().map(|t| RichText::new(t).heading().color(Color32::GREEN).size(40.0)).collect();
-
-      ui.group(|ui| {
-        ui.vertical_centered(|ui| {
-          for rt in rich_texts {
-            ui.add_visible(false, Separator::default());
-            ui.add_visible(false, Separator::default());
-            ui.add_visible(false, Separator::default());
-            ui.label( rt );
-          }
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.add_visible(false, Separator::default());
-          ui.label( bat_text );
-        })
+    ui.push_id("Outdoor Group Table", |ui| {
+        TableBuilder::new(ui)
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::auto())
+            .body(|body| {
+                body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                    let text_color = text_colors[row_index];
+                    let text_size = text_sizes[row_index];
+                    row.col(|ui| {
+                        ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(text_size) );
+                    });
+                    if let Some( txt ) = data_texts.get(row_index) {
+                        row.col(|ui| {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label( RichText::new(txt).heading().color(text_color).size(text_size) );
+                             });
+                        });
+                        row.col(|ui| {
+                            ui.label( RichText::new(&data_trend_texts[row_index]).heading().color(text_color).size(text_size) );
+                        });
+                        row.col(|ui| {
+                            ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(text_size) );
+                        });
+                    };
+                });
+            });
       });
   }
 
@@ -143,29 +161,30 @@ impl HomeDashboard {
              data_texts.push( format!("{}", wd.room_noise) );
     }
 
-    TableBuilder::new(ui)
-        .column(Column::auto())
-        .column(Column::auto())
-        .column(Column::auto())
-        .body(|body| {
-            body.rows(60.0,  name_texts.len(), |row_index, mut row| {
-                row.col(|ui| {
-                    ui.label( RichText::new(name_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+    ui.push_id("Home Group Table", |ui| {
+        TableBuilder::new(ui)
+            .column(Column::auto())
+            .column(Column::auto())
+            .column(Column::auto())
+            .body(|body| {
+                body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                    row.col(|ui| {
+                        ui.label( RichText::new(name_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                    });
+                    if let Some( txt ) = data_texts.get(row_index) {
+                        row.col(|ui| {
+                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
+                             });
+                        });
+                        row.col(|ui| {
+                            ui.label( RichText::new(unit_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                        });
+                    };
                 });
-                if let Some( txt ) = data_texts.get(row_index) {
-                    row.col(|ui| {
-                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                            ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
-                         });
-                    });
-                    row.col(|ui| {
-                        ui.label( RichText::new(unit_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
-                    });
-                };
             });
-        });
+      });
   }
-
 }
 
 impl eframe::App for HomeDashboard {
@@ -231,10 +250,8 @@ impl eframe::App for HomeDashboard {
          self.gui_state.edifier_switch_state = new_switch_state;
 
          ui.end_row();
-         for _ in 1..5 {
-             ui.add_visible(false, Separator::default());
-         }
-         self.outdoor_group(ui, &self.state.weather_data);
+         ui.add_visible(false, Separator::default());
+         self.outdoor_group_table(ui, &self.state.weather_data);
          ui.end_row();
       });
 
