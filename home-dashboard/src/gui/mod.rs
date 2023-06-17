@@ -5,6 +5,7 @@ use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
 use log;
+use egui_extras::{TableBuilder, Column};
 
 use crate::interface::*;
 use crate::worker::worker_thread;
@@ -25,6 +26,14 @@ pub struct HomeDashboard {
 impl HomeDashboard {
   pub fn new(cc : &eframe::CreationContext<'_>, cfg : HomeDashboardConfig) -> Self {
 
+    //if let Some( monitor_size ) = cc.integration_info.window_info.monitor_size {
+
+        //const EXPECTED_POINT_HEIGHT : f32 = 720.0;
+        //let ppp = monitor_size.y / EXPECTED_POINT_HEIGHT;
+        //cc.egui_ctx.set_pixels_per_point( ppp );
+        //log::debug!("Setting pixels_per_point  {}", ppp);
+    //}
+    log::debug!("HomeDashobard created with IntegragtionInfo {:?}", cc.integration_info);
     const MAX_NUM_MESSAGES : usize = 10;
 
     let (worker_sender, gui_receiver) = channel::<HomeState>(MAX_NUM_MESSAGES);
@@ -122,27 +131,41 @@ impl HomeDashboard {
       });
   }
 
-  fn home_group(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-     let mut texts = Vec::<String>::new();
+  fn home_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
+    let name_texts = vec!["Temperature    ", "Humidity", "CO2", "Noise"];
+    let unit_texts = vec!["°C", "%", "ppm", "dB"];
 
-     if let Some( wd ) = wd {
-             texts.push( format!("{:.1} °C", wd.room_temperature) );
-             texts.push( format!("{} %", wd.room_humidity) );
-             texts.push( format!("{} ppm", wd.room_co2) );
-             texts.push( format!("{} dB", wd.room_noise) );
-     }
+    let mut data_texts = Vec::<String>::new();
+    if let Some( wd ) = wd {
+             data_texts.push( format!("{:.1}", wd.room_temperature) );
+             data_texts.push( format!("{}", wd.room_humidity) );
+             data_texts.push( format!("{}", wd.room_co2) );
+             data_texts.push( format!("{}", wd.room_noise) );
+    }
 
-      ui.group(|ui| {
-        ui.vertical_centered(|ui| {
-          for txt in texts {
-            ui.add_visible(false, Separator::default());
-            ui.add_visible(false, Separator::default());
-            ui.add_visible(false, Separator::default());
-            ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
-          }
-        })
-      });
+    TableBuilder::new(ui)
+        .column(Column::auto())
+        .column(Column::auto())
+        .column(Column::auto())
+        .body(|body| {
+            body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                row.col(|ui| {
+                    ui.label( RichText::new(name_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                });
+                if let Some( txt ) = data_texts.get(row_index) {
+                    row.col(|ui| {
+                        ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                            ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
+                         });
+                    });
+                    row.col(|ui| {
+                        ui.label( RichText::new(unit_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                    });
+                };
+            });
+        });
   }
+
 }
 
 impl eframe::App for HomeDashboard {
@@ -188,7 +211,7 @@ impl eframe::App for HomeDashboard {
        .show(ui, |ui| {
          ui.end_row();
          ui.add_visible(false, Separator::default());
-         self.home_group(ui, &self.state.weather_data);
+         self.home_group_table(ui, &self.state.weather_data);
          ui.add_visible(false, Separator::default());
 
          let new_switch_state = self.bt_group(ui, "Aeropex",
