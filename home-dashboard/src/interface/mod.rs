@@ -37,7 +37,6 @@ pub struct OutdoorWeatherData {
   pub temperature : f32,
   pub temperature_trend : Option<Trend>,
   pub humidity : i32,
-  pub battery : i32,
 }
 
 #[derive(Debug)]

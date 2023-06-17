@@ -96,13 +96,13 @@ impl HomeDashboard {
   }
 
   fn outdoor_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-    let name_texts = vec!["Temperature    ", "Humidity", "Pressure ", "battery"];
-    let unit_texts = vec!["°C", "%", "mmHg", "%"];
-    let text_colors = vec![Color32::GREEN, Color32::GREEN, Color32::GREEN, Color32::GRAY];
-    let text_sizes = vec![40.0, 40.0, 40.0, 20.0];
+    let name_texts = vec!["Temperature    ", "Humidity", "Pressure "];
+    let unit_texts = vec!["°C", "%", "mmHg"];
+    let text_colors = vec![Color32::GREEN, Color32::GREEN, Color32::GREEN];
+    let text_sizes = vec![40.0, 40.0, 40.0];
 
-    let mut data_texts = vec![String::new(); 4];
-    let mut data_trend_texts = vec![String::new(); 4];
+    let mut data_texts = vec![String::new(); 3];
+    let mut data_trend_texts = vec![String::new(); 3];
 
     if let Some( wd ) = wd {
 
@@ -110,7 +110,6 @@ impl HomeDashboard {
             data_texts[0] = format!("{:.1}", od.temperature);
             data_trend_texts[0] = show_trend(&od.temperature_trend);
             data_texts[1] = format!("{}", od.humidity);
-            data_texts[3] = format!("{}", od.battery);
         }
 
         let pressure = wd.pressure / 1.333223684; //to mmHg

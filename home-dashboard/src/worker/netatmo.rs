@@ -55,7 +55,6 @@ pub async fn watch_netatmo_loop(
                 temperature : module.dashboard_data.Temperature,
                 temperature_trend : parse_trend(&module.dashboard_data.temp_trend),
                 humidity : module.dashboard_data.Humidity,
-                battery : module.battery_percent,
              })
         };
 
