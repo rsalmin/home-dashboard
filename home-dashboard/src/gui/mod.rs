@@ -1,6 +1,5 @@
-use eframe::egui;
-use crate::egui::*;
-use crate::egui::widget_text::RichText;
+use egui::*;
+use egui::widget_text::RichText;
 use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
@@ -78,18 +77,20 @@ impl HomeDashboard {
 
         let mut switch_state = switch_state;
 
-        ui.vertical_centered(|ui| {
-            ui.heading(label);
-            ui.add_visible(false, Separator::default());
-            indicator(ui, connect_state);
-            ui.add_visible(false, Separator::default());
-            if switch_button(ui, &mut switch_state).clicked() {
-                if switch_state {
-                    self.send_command( connect_command );
-                } else {
-                    self.send_command( disconnect_command );
+        ui.allocate_ui(Vec2::new(150.0, 400.0), |ui| {
+            ui.vertical_centered(|ui| {
+                ui.heading(label);
+                ui.add_visible(false, Separator::default());
+                indicator(ui, connect_state);
+                ui.add_visible(false, Separator::default());
+                if switch_button(ui, &mut switch_state, label).clicked() {
+                    if switch_state {
+                        self.send_command( connect_command );
+                    } else {
+                        self.send_command( disconnect_command );
+                    }
                 }
-            }
+            })
         });
 
      switch_state
@@ -243,6 +244,7 @@ impl eframe::App for HomeDashboard {
       Grid::new("unique grid")
        .min_col_width(frame_width / 6.0)
        .min_row_height(frame_height / 3.0)
+       .max_col_width(frame_width / 6.0)
        .num_columns(6)
        .show(ui, |ui| {
          ui.end_row();
@@ -250,21 +252,23 @@ impl eframe::App for HomeDashboard {
          self.home_group_table(ui, &self.state.weather_data);
          ui.add_visible(false, Separator::default());
 
-         let new_switch_state = self.bt_group(ui, "AEROPEX",
-           self.state.bt_state.is_aeropex_connected,
-           self.gui_state.aeropex_switch_state,
-           HomeCommand::ConnectAeropex,
-           HomeCommand::DisconnectAeropex,
-         );
-         self.gui_state.aeropex_switch_state = new_switch_state;
+         ui.horizontal_centered(|ui| {
+             let new_switch_state = self.bt_group(ui, "AEROPEX",
+               self.state.bt_state.is_aeropex_connected,
+               self.gui_state.aeropex_switch_state,
+               HomeCommand::ConnectAeropex,
+               HomeCommand::DisconnectAeropex,
+             );
+             self.gui_state.aeropex_switch_state = new_switch_state;
 
-         let new_switch_state = self.bt_group(ui, "EDIFIER",
-           self.state.bt_state.is_edifier_connected,
-           self.gui_state.edifier_switch_state,
-           HomeCommand::ConnectEdifier,
-           HomeCommand::DisconnectEdifier,
-         );
-         self.gui_state.edifier_switch_state = new_switch_state;
+             let new_switch_state = self.bt_group(ui, "EDIFIER",
+               self.state.bt_state.is_edifier_connected,
+               self.gui_state.edifier_switch_state,
+               HomeCommand::ConnectEdifier,
+               HomeCommand::DisconnectEdifier,
+             );
+            self.gui_state.edifier_switch_state = new_switch_state;
+         });
 
          ui.end_row();
          ui.add_visible(false, Separator::default());
@@ -299,14 +303,14 @@ fn indicator(ui: &mut egui::Ui, is_on: bool) {
 
 }
 
-fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
+fn switch_button(ui: &mut egui::Ui, on: &mut bool, label : &str) -> egui::Response {
     let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 5.0);
     let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
     if response.clicked() {
         *on = !*on;
         response.mark_changed();
     }
-    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, *on, ""));
+    response.widget_info(|| egui::WidgetInfo::selected(egui::WidgetType::Checkbox, *on, label));
 
     if ui.is_rect_visible(rect) {
         let how_on = ui.ctx().animate_bool(response.id, *on);
