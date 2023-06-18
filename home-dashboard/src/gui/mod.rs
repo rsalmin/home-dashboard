@@ -84,7 +84,8 @@ impl HomeDashboard {
 
         ui.allocate_ui(Vec2::new(150.0, 400.0), |ui| {
             ui.vertical_centered(|ui| {
-                ui.heading(label);
+                let text_color = Color32::from_rgb(242, 174, 73);
+                ui.label( RichText::new(label).color(text_color).heading() );
                 ui.add_visible(false, Separator::default());
                 indicator(ui, connect_state);
                 ui.add_visible(false, Separator::default());
@@ -104,8 +105,9 @@ impl HomeDashboard {
   fn outdoor_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
     let name_texts = vec![self.texts.temperature(), self.texts.humidity(), self.texts.pressure()];
     let unit_texts = vec!["°C", "%", "mmHg"];
-    let text_colors = vec![Color32::GREEN, Color32::GREEN, Color32::GREEN];
     let text_sizes = vec![40.0, 40.0, 40.0];
+    let text_color = Color32::from_rgb(242, 174, 73);
+    let data_color = Color32::GREEN;
 
     let mut data_texts = vec![String::new(); 3];
     let mut data_trends : Vec<Option<Trend>> = vec![None; 3];
@@ -131,7 +133,6 @@ impl HomeDashboard {
             .column(Column::auto())
             .body(|body| {
                 body.rows(60.0,  name_texts.len(), |row_index, mut row| {
-                    let text_color = text_colors[row_index];
                     let text_size = text_sizes[row_index];
                     row.col(|ui| {
                         ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(text_size) );
@@ -139,7 +140,7 @@ impl HomeDashboard {
                     if let Some( txt ) = data_texts.get(row_index) {
                         row.col(|ui| {
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label( RichText::new(txt).heading().color(text_color).size(text_size) );
+                                ui.label( RichText::new(txt).heading().color(data_color).size(text_size) );
                              });
                         });
                         row.col(|ui| {
@@ -168,6 +169,9 @@ impl HomeDashboard {
              data_texts.push( format!("{}", wd.room_noise) );
     }
 
+    let text_color = Color32::from_rgb(242, 174, 73);
+    let data_color = Color32::GREEN;
+
     ui.push_id("Home Group Table", |ui| {
         TableBuilder::new(ui)
             .column(Column::auto())
@@ -176,16 +180,16 @@ impl HomeDashboard {
             .body(|body| {
                 body.rows(60.0,  name_texts.len(), |row_index, mut row| {
                     row.col(|ui| {
-                        ui.label( RichText::new(name_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                        ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(40.0) );
                     });
                     if let Some( txt ) = data_texts.get(row_index) {
                         row.col(|ui| {
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label( RichText::new(txt).heading().color(Color32::GREEN).size(40.0) );
+                                ui.label( RichText::new(txt).heading().color(data_color).size(40.0) );
                              });
                         });
                         row.col(|ui| {
-                            ui.label( RichText::new(unit_texts[row_index]).heading().color(Color32::GREEN).size(40.0) );
+                            ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(40.0) );
                         });
                     };
                 });
