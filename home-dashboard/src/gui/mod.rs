@@ -76,27 +76,21 @@ impl HomeDashboard {
     connect_command : HomeCommand,
     disconnect_command : HomeCommand) -> bool {
 
-      let aeropex_state_text = if connect_state {
-            RichText::new("Connected").heading().color(Color32::GREEN)
-          } else {
-            RichText::new("Disconnected").heading()
-      };
+        let mut switch_state = switch_state;
 
-      let mut switch_state = switch_state;
-
-      ui.group(|ui| {
         ui.vertical_centered(|ui| {
-          ui.heading(label);
-          ui.label( aeropex_state_text );
-          if switch_button(ui, &mut switch_state).clicked() {
-            if switch_state {
-              self.send_command( connect_command );
-            } else {
-              self.send_command( disconnect_command );
+            ui.heading(label);
+            ui.add_visible(false, Separator::default());
+            indicator(ui, connect_state);
+            ui.add_visible(false, Separator::default());
+            if switch_button(ui, &mut switch_state).clicked() {
+                if switch_state {
+                    self.send_command( connect_command );
+                } else {
+                    self.send_command( disconnect_command );
+                }
             }
-          }
         });
-      });
 
      switch_state
   }
@@ -256,7 +250,7 @@ impl eframe::App for HomeDashboard {
          self.home_group_table(ui, &self.state.weather_data);
          ui.add_visible(false, Separator::default());
 
-         let new_switch_state = self.bt_group(ui, "Aeropex",
+         let new_switch_state = self.bt_group(ui, "AEROPEX",
            self.state.bt_state.is_aeropex_connected,
            self.gui_state.aeropex_switch_state,
            HomeCommand::ConnectAeropex,
@@ -264,7 +258,7 @@ impl eframe::App for HomeDashboard {
          );
          self.gui_state.aeropex_switch_state = new_switch_state;
 
-         let new_switch_state = self.bt_group(ui, "Edifier",
+         let new_switch_state = self.bt_group(ui, "EDIFIER",
            self.state.bt_state.is_edifier_connected,
            self.gui_state.edifier_switch_state,
            HomeCommand::ConnectEdifier,
@@ -286,8 +280,27 @@ impl eframe::App for HomeDashboard {
 
 }
 
+fn indicator(ui: &mut egui::Ui, is_on: bool) {
+    let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 2.0);
+    let (rect, mut _response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
+
+
+    if ui.is_rect_visible(rect) {
+        let ext_c = Color32::GRAY;
+        let color = if is_on { Color32::GREEN } else { Color32::GRAY };
+
+        let radius = 0.5 * rect.width();
+        let center = rect.center();
+        let stroke = egui::Stroke::new(1.0, ext_c);
+
+        ui.painter().circle_stroke(center, radius, stroke);
+        ui.painter().circle_filled(center, 0.9*radius, color);
+    }
+
+}
+
 fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
-    let desired_size = ui.spacing().interact_size.y * egui::vec2(1.0, 2.5);
+    let desired_size = ui.spacing().interact_size.y * egui::vec2(2.0, 5.0);
     let (rect, mut response) = ui.allocate_exact_size(desired_size, egui::Sense::click());
     if response.clicked() {
         *on = !*on;
