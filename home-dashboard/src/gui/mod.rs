@@ -5,12 +5,14 @@ use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
 use log;
-use egui_extras::{TableBuilder, Column, image::RetainedImage};
-use std::fs;
+use egui_extras::{TableBuilder, Column};
 use std::path::Path;
 
 use crate::interface::*;
 use crate::worker::worker_thread;
+
+mod images;
+use images::Images;
 
 #[derive(Default)]
 pub struct GUIState {
@@ -23,9 +25,7 @@ pub struct HomeDashboard {
   gui_state : GUIState,
   receiver : Receiver<HomeState>,
   sender : Sender<HomeCommand>,
-  arrow_up_image : Option<RetainedImage>,
-  arrow_down_image : Option<RetainedImage>,
-  stable_image : Option<RetainedImage>,
+  images : Images,
 }
 
 impl HomeDashboard {
@@ -53,18 +53,12 @@ impl HomeDashboard {
     // it detaches but we are control it via channels
     thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx, cfg));
 
-    let up_image =  read_svg_image_with_log(Path::new("up_arrow.svg"));
-    let down_image =  read_svg_image_with_log(Path::new("down_arrow.svg"));
-    let stable_image =  read_svg_image_with_log(Path::new("stable.svg"));
-
     HomeDashboard {
      state : HomeState::default(),
      gui_state : GUIState::default(),
      receiver : gui_receiver,
      sender : gui_sender,
-     arrow_up_image : up_image,
-     arrow_down_image: down_image,
-     stable_image: stable_image,
+     images : Images::new(Path::new("home-dashboard/resources")),
    }
   }
 
@@ -204,9 +198,9 @@ impl HomeDashboard {
     let scale = 0.5;
 
     let image = match trend {
-       Trend::Stable => &self.stable_image,
-       Trend::Down => &self.arrow_down_image,
-       Trend::Up => &self.arrow_up_image,
+       Trend::Stable => &self.images.stable,
+       Trend::Down => &self.images.arrow_down,
+       Trend::Up => &self.images.arrow_up,
     };
 
     if let Some( image ) = image {
@@ -319,18 +313,4 @@ fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
     }
 
     response
-}
-
-
-fn read_svg_image_with_log(file_path : &Path) -> Option<RetainedImage>
-{
-    match fs::read(file_path) {
-        Err( err ) => {log::error!("Failed to read {} : {}", file_path.display(), err); None},
-        Ok( image_bytes ) => {
-            match RetainedImage::from_svg_bytes("up arrow image", &image_bytes) {
-                Err( err ) => { log::error!("Failed to convert {} content to svg image : {}", file_path.display(), err); None },
-                Ok( svg_image ) => Some( svg_image),
-            }
-        },
-    }
 }
