@@ -13,6 +13,9 @@ use crate::worker::worker_thread;
 mod images;
 use images::Images;
 
+mod texts;
+use texts::{Texts, Language};
+
 #[derive(Default)]
 pub struct GUIState {
   aeropex_switch_state : bool,
@@ -25,6 +28,7 @@ pub struct HomeDashboard {
   receiver : Receiver<HomeState>,
   sender : Sender<HomeCommand>,
   images : Images,
+  texts : Texts,
 }
 
 impl HomeDashboard {
@@ -58,6 +62,7 @@ impl HomeDashboard {
      receiver : gui_receiver,
      sender : gui_sender,
      images : Images::new(Path::new("home-dashboard/resources")),
+     texts : Texts::new(Language::Russian),
    }
   }
 
@@ -97,7 +102,7 @@ impl HomeDashboard {
   }
 
   fn outdoor_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-    let name_texts = vec!["Temperature    ", "Humidity", "Pressure "];
+    let name_texts = vec![self.texts.temperature(), self.texts.humidity(), self.texts.pressure()];
     let unit_texts = vec!["°C", "%", "mmHg"];
     let text_colors = vec![Color32::GREEN, Color32::GREEN, Color32::GREEN];
     let text_sizes = vec![40.0, 40.0, 40.0];
@@ -152,7 +157,7 @@ impl HomeDashboard {
   }
 
   fn home_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
-    let name_texts = vec!["Temperature    ", "Humidity", "CO2", "Noise"];
+    let name_texts = vec![self.texts.temperature(), self.texts.humidity(), self.texts.co2(), self.texts.noise()];
     let unit_texts = vec!["°C", "%", "ppm", "dB"];
 
     let mut data_texts = Vec::<String>::new();
