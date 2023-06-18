@@ -5,7 +5,9 @@ use tokio::sync::mpsc::{channel, Sender, Receiver};
 use tokio::sync::mpsc::error::TryRecvError;
 use std::thread;
 use log;
-use egui_extras::{TableBuilder, Column};
+use egui_extras::{TableBuilder, Column, image::RetainedImage};
+use std::fs;
+use std::path::Path;
 
 use crate::interface::*;
 use crate::worker::worker_thread;
@@ -21,6 +23,9 @@ pub struct HomeDashboard {
   gui_state : GUIState,
   receiver : Receiver<HomeState>,
   sender : Sender<HomeCommand>,
+  arrow_up_image : Option<RetainedImage>,
+  arrow_down_image : Option<RetainedImage>,
+  stable_image : Option<RetainedImage>,
 }
 
 impl HomeDashboard {
@@ -48,11 +53,18 @@ impl HomeDashboard {
     // it detaches but we are control it via channels
     thread::spawn(move|| worker_thread(worker_sender, worker_receiver, ctx, cfg));
 
+    let up_image =  read_svg_image_with_log(Path::new("up_arrow.svg"));
+    let down_image =  read_svg_image_with_log(Path::new("down_arrow.svg"));
+    let stable_image =  read_svg_image_with_log(Path::new("stable.svg"));
+
     HomeDashboard {
      state : HomeState::default(),
      gui_state : GUIState::default(),
      receiver : gui_receiver,
      sender : gui_sender,
+     arrow_up_image : up_image,
+     arrow_down_image: down_image,
+     stable_image: stable_image,
    }
   }
 
@@ -102,19 +114,19 @@ impl HomeDashboard {
     let text_sizes = vec![40.0, 40.0, 40.0];
 
     let mut data_texts = vec![String::new(); 3];
-    let mut data_trend_texts = vec![String::new(); 3];
+    let mut data_trends : Vec<Option<Trend>> = vec![None; 3];
 
     if let Some( wd ) = wd {
 
         if let Some( od ) = &wd.outdoor_weather {
             data_texts[0] = format!("{:.1}", od.temperature);
-            data_trend_texts[0] = show_trend(&od.temperature_trend);
+            data_trends[0] = od.temperature_trend.clone();
             data_texts[1] = format!("{}", od.humidity);
         }
 
         let pressure = wd.pressure / 1.333223684; //to mmHg
         data_texts[2] = format!("{:.1}", pressure);
-        data_trend_texts[2] =  show_trend(&wd.pressure_trend);
+        data_trends[2] =  wd.pressure_trend.clone();
     }
 
     ui.push_id("Outdoor Group Table", |ui| {
@@ -137,7 +149,9 @@ impl HomeDashboard {
                              });
                         });
                         row.col(|ui| {
-                            ui.label( RichText::new(&data_trend_texts[row_index]).heading().color(text_color).size(text_size) );
+                            if let Some( trend ) = &data_trends[row_index] {
+                                self.show_trend(ui, trend);
+                            };
                         });
                         row.col(|ui| {
                             ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(text_size) );
@@ -184,6 +198,22 @@ impl HomeDashboard {
             });
       });
   }
+
+  fn show_trend(&self, ui : &mut Ui, trend : &Trend)
+  {
+    let scale = 0.5;
+
+    let image = match trend {
+       Trend::Stable => &self.stable_image,
+       Trend::Down => &self.arrow_down_image,
+       Trend::Up => &self.arrow_up_image,
+    };
+
+    if let Some( image ) = image {
+        image.show_scaled(ui, scale);
+    };
+  }
+
 }
 
 impl eframe::App for HomeDashboard {
@@ -292,15 +322,15 @@ fn switch_button(ui: &mut egui::Ui, on: &mut bool) -> egui::Response {
 }
 
 
-fn show_trend(t : &Option<Trend>) -> String
+fn read_svg_image_with_log(file_path : &Path) -> Option<RetainedImage>
 {
-  match t {
-       None => String::from("(?)"),
-       Some( t ) =>
-           match t {
-               Trend::Stable => String::from("="),
-               Trend::Up => String::from("/|\\"),
-               Trend::Down => String::from("\\|/"),
-           },
-  }
+    match fs::read(file_path) {
+        Err( err ) => {log::error!("Failed to read {} : {}", file_path.display(), err); None},
+        Ok( image_bytes ) => {
+            match RetainedImage::from_svg_bytes("up arrow image", &image_bytes) {
+                Err( err ) => { log::error!("Failed to convert {} content to svg image : {}", file_path.display(), err); None },
+                Ok( svg_image ) => Some( svg_image),
+            }
+        },
+    }
 }
