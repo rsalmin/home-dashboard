@@ -250,7 +250,6 @@ impl eframe::App for HomeDashboard {
          ui.end_row();
          ui.add_visible(false, Separator::default());
          self.home_group_table(ui, &self.state.weather_data);
-         ui.add_visible(false, Separator::default());
 
          ui.horizontal_centered(|ui| {
              let new_switch_state = self.bt_group(ui, "AEROPEX",
@@ -270,9 +269,8 @@ impl eframe::App for HomeDashboard {
             self.gui_state.edifier_switch_state = new_switch_state;
          });
 
-         ui.end_row();
-         ui.add_visible(false, Separator::default());
          self.outdoor_group_table(ui, &self.state.weather_data);
+         ui.end_row();
          ui.end_row();
       });
 
