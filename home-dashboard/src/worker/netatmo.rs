@@ -12,16 +12,17 @@ pub async fn watch_netatmo_loop(
     cfg : ConnectConfig) -> Result<(), String>
 {
   let client = reqwest::Client::new();
+  let timeout = Some( Duration::from_secs(1) );
 
-  let mut token =  get_access_token(&client, &cfg).await?;
+  let mut token =  get_access_token(&client, &cfg, &timeout).await?;
 
   loop {
     if token.expires_at < Instant::now() {
       log::info!("Access token is expired!");
-      token = get_fresh_token(&client, &cfg, &token).await?;
+      token = get_fresh_token(&client, &cfg, &token, &timeout).await?;
     }
 
-    let res = get_stations_data(&client, &token).await?;
+    let res = get_stations_data(&client, &token, &timeout).await?;
 
      let time_server = NaiveDateTime::from_timestamp_opt(res.time_server, 0);
      match time_server {
