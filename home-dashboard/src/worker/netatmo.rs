@@ -1,14 +1,21 @@
 use reqwest;
 use netatmo_connect::*;
-use crate::interface::{WeatherData, OutdoorWeatherData, Trend};
+use crate::interface::{WeatherData, OutdoorWeatherData, AirQualityData, Trend};
 use std::time::{Duration, Instant};
 use tokio::sync::mpsc::Sender;
 use tokio::sync::mpsc::error::TrySendError;
 use chrono::naive::NaiveDateTime;
 use std::option::Option;
 
+#[derive(Default)]
+pub struct NetatmoData {
+    pub weather_station : Option<WeatherData>,
+    pub child_room_data : Option<AirQualityData>,
+    pub office_room_data : Option<AirQualityData>,
+}
+
 pub async fn watch_netatmo_loop(
-    netatmo_sender : Sender<Option<WeatherData>> ,
+    netatmo_sender : Sender<NetatmoData> ,
     cfg : ConnectConfig) -> Result<(), String>
 {
   let client = reqwest::Client::new();
@@ -30,7 +37,9 @@ pub async fn watch_netatmo_loop(
        Some( v ) => println!("server naive date time: {}", v),
      };
 
-    let weather_data_opt = if res.body.devices.is_empty() {
+    let mut netatmo_data = NetatmoData::default();
+
+    netatmo_data.weather_station = if res.body.devices.is_empty() {
         log::warn!("Can't find any device in netatmo data!");
         None
     } else {
@@ -62,7 +71,17 @@ pub async fn watch_netatmo_loop(
         Some( weather_data )
     };
 
-    match netatmo_sender.try_send(weather_data_opt) {
+    let res = get_homecoachs_data(&client, &token, &timeout).await?;
+    for d in res.body.devices {
+        if d.station_name == "Переговорка" {
+            netatmo_data.office_room_data = Some( from_dashboard_data( &d.dashboard_data ) );
+        }
+        if d.station_name == "Детская" {
+            netatmo_data.child_room_data = Some( from_dashboard_data( &d.dashboard_data ) );
+        }
+    }
+
+    match netatmo_sender.try_send(netatmo_data) {
       Ok(()) => (),
       Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send weather data, update_state_loop is not consuming it!"),
       Err( TrySendError::Closed( _ ) ) => {
@@ -86,4 +105,16 @@ fn parse_trend(str : &str) -> Option<Trend>
 
   log::error!("Unknown string for describing Trend: {}", str);
   None
+}
+
+
+fn from_dashboard_data( device_data : &HomeCoachsDeviceData ) -> AirQualityData
+{
+    let mut data = AirQualityData::default();
+    data.room_temperature = device_data.Temperature;
+    data.room_humidity = device_data.Humidity;
+    data.room_co2 = device_data.CO2;
+    data.room_noise = device_data.Noise;
+
+    data
 }

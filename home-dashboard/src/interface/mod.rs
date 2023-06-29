@@ -6,6 +6,8 @@ use std::option::Option;
 pub struct HomeState {
   pub bt_state : BluetoothState,
   pub weather_data : Option<WeatherData>,
+  pub child_room_data : Option<AirQualityData>,
+  pub office_room_data : Option<AirQualityData>,
 }
 
 #[derive(Default, Debug, Clone)]
@@ -37,6 +39,14 @@ pub struct OutdoorWeatherData {
   pub temperature : f32,
   pub temperature_trend : Option<Trend>,
   pub humidity : i32,
+}
+
+#[derive(Default, Debug, Clone)]
+pub struct AirQualityData {
+  pub room_temperature : f32,
+  pub room_humidity : i32,
+  pub room_co2 : i32,
+  pub room_noise : i32,
 }
 
 #[derive(Debug)]
