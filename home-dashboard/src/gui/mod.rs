@@ -74,6 +74,7 @@ impl HomeDashboard {
 
   fn bt_switch(&self,
     ui: &mut Ui,
+    width : f32,
     label : &str,
     connect_state : bool,
     switch_state : bool,
@@ -82,7 +83,7 @@ impl HomeDashboard {
 
         let mut switch_state = switch_state;
 
-        ui.allocate_ui(Vec2::new(150.0, 400.0), |ui| {
+        ui.allocate_ui(Vec2::new(width, 400.0), |ui| {
             ui.vertical_centered(|ui| {
                 let text_color = Color32::from_rgb(242, 174, 73);
                 ui.label( RichText::new(label).color(text_color).heading() );
@@ -104,22 +105,30 @@ impl HomeDashboard {
 
   fn bt_group(&mut self, ui: &mut Ui)
   {
-      ui.horizontal_centered(|ui| {
-          let new_switch_state = self.bt_switch(ui, "AEROPEX",
+    let title_color = Color32::from_rgb(105, 209, 203);
+    ui.vertical_centered(|ui| {
+        ui.group(|ui| {
+            ui.label( RichText::new("Аудио").heading().color(title_color).size(20.0) );
+        });
+        ui.horizontal_centered(|ui| {
+            let w = ui.available_width();
+            ui.add_visible(false, Separator::default().spacing(w/4.0) );
+            let new_switch_state = self.bt_switch(ui, w/4.0, "AEROPEX",
               self.state.bt_state.is_aeropex_connected,
               self.gui_state.aeropex_switch_state,
               HomeCommand::ConnectAeropex,
               HomeCommand::DisconnectAeropex,
-          );
-          self.gui_state.aeropex_switch_state = new_switch_state;
+            );
+            self.gui_state.aeropex_switch_state = new_switch_state;
 
-          let new_switch_state = self.bt_switch(ui, "EDIFIER",
+            let new_switch_state = self.bt_switch(ui, w/4.0, "EDIFIER",
               self.state.bt_state.is_edifier_connected,
               self.gui_state.edifier_switch_state,
               HomeCommand::ConnectEdifier,
               HomeCommand::DisconnectEdifier,
-          );
-          self.gui_state.edifier_switch_state = new_switch_state;
+            );
+            self.gui_state.edifier_switch_state = new_switch_state;
+       });
     });
   }
 
