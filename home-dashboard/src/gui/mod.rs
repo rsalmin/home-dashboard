@@ -72,7 +72,7 @@ impl HomeDashboard {
     }
   }
 
-  fn bt_group(&self,
+  fn bt_switch(&self,
     ui: &mut Ui,
     label : &str,
     connect_state : bool,
@@ -102,12 +102,34 @@ impl HomeDashboard {
      switch_state
   }
 
+  fn bt_group(&mut self, ui: &mut Ui)
+  {
+      ui.horizontal_centered(|ui| {
+          let new_switch_state = self.bt_switch(ui, "AEROPEX",
+              self.state.bt_state.is_aeropex_connected,
+              self.gui_state.aeropex_switch_state,
+              HomeCommand::ConnectAeropex,
+              HomeCommand::DisconnectAeropex,
+          );
+          self.gui_state.aeropex_switch_state = new_switch_state;
+
+          let new_switch_state = self.bt_switch(ui, "EDIFIER",
+              self.state.bt_state.is_edifier_connected,
+              self.gui_state.edifier_switch_state,
+              HomeCommand::ConnectEdifier,
+              HomeCommand::DisconnectEdifier,
+          );
+          self.gui_state.edifier_switch_state = new_switch_state;
+    });
+  }
+
   fn outdoor_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
     let name_texts = vec![self.texts.temperature(), self.texts.humidity(), self.texts.pressure()];
     let unit_texts = vec!["°C", "%", "mmHg"];
     let text_sizes = vec![40.0, 40.0, 40.0];
     let text_color = Color32::from_rgb(242, 174, 73);
     let data_color = Color32::GREEN;
+    let title_color = Color32::from_rgb(105, 209, 203);
 
     let mut data_texts = vec![String::new(); 3];
     let mut data_trends : Vec<Option<Trend>> = vec![None; 3];
@@ -126,17 +148,24 @@ impl HomeDashboard {
     }
 
     ui.push_id("Outdoor Group Table", |ui| {
-        TableBuilder::new(ui)
-            .column(Column::auto())
-            .column(Column::auto())
-            .column(Column::auto())
-            .column(Column::auto())
-            .body(|body| {
-                body.rows(60.0,  name_texts.len(), |row_index, mut row| {
-                    let text_size = text_sizes[row_index];
-                    row.col(|ui| {
-                        ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(text_size) );
-                    });
+        ui.vertical_centered(|ui| {
+            ui.group(|ui| {
+                    ui.label( RichText::new("Во дворе").heading().color(title_color).size(20.0) );
+            });
+            let w = ui.available_width();
+            TableBuilder::new(ui)
+                .column( Column::exact(w/2.) )
+                .column( Column::exact(w/6.) )
+                .column( Column::exact(w/12.) )
+                .column( Column::exact(w/4.) )
+                .body(|body| {
+                    body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                        let text_size = text_sizes[row_index];
+                        row.col(|ui| {
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(text_size) );
+                            });
+                        });
                     if let Some( txt ) = data_texts.get(row_index) {
                         row.col(|ui| {
                             ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
@@ -149,12 +178,15 @@ impl HomeDashboard {
                             };
                         });
                         row.col(|ui| {
-                            ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(text_size) );
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(text_size) );
+                            });
                         });
                     };
                 });
             });
-      });
+        });
+    });
   }
 
   fn home_group_table(&self, ui: &mut Ui, title : &str, wd : &Option<AirQualityData> ) {
@@ -270,6 +302,7 @@ impl eframe::App for HomeDashboard {
        .num_columns(6)
        .show(ui, |ui| {
          ui.end_row();
+
          ui.add_visible(false, Separator::default());
          let home_data =
              if let Some( wd ) = &self.state.weather_data {
@@ -282,34 +315,16 @@ impl eframe::App for HomeDashboard {
              } else {
                 None
              };
-         self.home_group_table(ui,  "Дом", &home_data);
 
-         ui.horizontal_centered(|ui| {
-             let new_switch_state = self.bt_group(ui, "AEROPEX",
-               self.state.bt_state.is_aeropex_connected,
-               self.gui_state.aeropex_switch_state,
-               HomeCommand::ConnectAeropex,
-               HomeCommand::DisconnectAeropex,
-             );
-             self.gui_state.aeropex_switch_state = new_switch_state;
-
-             let new_switch_state = self.bt_group(ui, "EDIFIER",
-               self.state.bt_state.is_edifier_connected,
-               self.gui_state.edifier_switch_state,
-               HomeCommand::ConnectEdifier,
-               HomeCommand::DisconnectEdifier,
-             );
-            self.gui_state.edifier_switch_state = new_switch_state;
-         });
 
          self.outdoor_group_table(ui, &self.state.weather_data);
+         self.bt_group(ui);
          ui.end_row();
+
          ui.add_visible(false, Separator::default());
-         ui.add_visible(false, Separator::default());
-         ui.add_visible(false, Separator::default());
+         self.home_group_table(ui,  "Дом", &home_data);
          self.home_group_table(ui,  "Переговорка", &self.state.office_room_data);
          self.home_group_table(ui,  "Детская", &self.state.child_room_data);
-
          ui.end_row();
       });
 
