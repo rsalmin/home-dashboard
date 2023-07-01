@@ -157,7 +157,7 @@ impl HomeDashboard {
       });
   }
 
-  fn home_group_table(&self, ui: &mut Ui, wd : &Option<WeatherData> ) {
+  fn home_group_table(&self, ui: &mut Ui, title : &str, wd : &Option<AirQualityData> ) {
     let name_texts = vec![self.texts.temperature(), self.texts.humidity(), self.texts.co2(), self.texts.noise()];
     let unit_texts = vec!["°C", "%", "ppm", "dB"];
 
@@ -171,30 +171,41 @@ impl HomeDashboard {
 
     let text_color = Color32::from_rgb(242, 174, 73);
     let data_color = Color32::GREEN;
+    let title_color = Color32::from_rgb(105, 209, 203);
 
-    ui.push_id("Home Group Table", |ui| {
-        TableBuilder::new(ui)
-            .column(Column::auto())
-            .column(Column::auto())
-            .column(Column::auto())
-            .body(|body| {
-                body.rows(60.0,  name_texts.len(), |row_index, mut row| {
-                    row.col(|ui| {
-                        ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(40.0) );
-                    });
-                    if let Some( txt ) = data_texts.get(row_index) {
-                        row.col(|ui| {
-                            ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
-                                ui.label( RichText::new(txt).heading().color(data_color).size(40.0) );
-                             });
-                        });
-                        row.col(|ui| {
-                            ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(40.0) );
-                        });
-                    };
-                });
+    ui.push_id(title, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.group(|ui| {
+                    ui.label( RichText::new(title).heading().color(title_color).size(20.0) );
             });
-      });
+            let w = ui.available_width();
+            TableBuilder::new(ui)
+                .column( Column::exact(w/2.) )
+                .column( Column::exact(w/4.) )
+                .column( Column::exact(w/4.) )
+                .body(|body| {
+                    body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                        row.col(|ui| {
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(40.0) );
+                            });
+                        });
+                        if let Some( txt ) = data_texts.get(row_index) {
+                            row.col(|ui| {
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    ui.label( RichText::new(txt).heading().color(data_color).size(40.0) );
+                                 });
+                            });
+                            row.col(|ui| {
+                                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                    ui.label( RichText::new(unit_texts[row_index]).heading().color(text_color).size(40.0) );
+                                });
+                            });
+                       };
+                   });
+             });
+        });
+    });
   }
 
   fn show_trend(&self, ui : &mut Ui, trend : &Trend)
@@ -220,6 +231,8 @@ impl eframe::App for HomeDashboard {
     log::debug!("screen_rect {:?}", ctx.screen_rect());
     log::debug!("available_rect {:?}", ctx.available_rect());
     log::debug!("pixels_per_point {}", ctx.pixels_per_point());
+
+    //ctx.set_debug_on_hover(true);
 
     //only last message from channel is actual
     let mut new_state : Option<HomeState> = None;
@@ -258,7 +271,18 @@ impl eframe::App for HomeDashboard {
        .show(ui, |ui| {
          ui.end_row();
          ui.add_visible(false, Separator::default());
-         self.home_group_table(ui, &self.state.weather_data);
+         let home_data =
+             if let Some( wd ) = &self.state.weather_data {
+                 Some ( AirQualityData {
+                     room_temperature : wd.room_temperature,
+                     room_humidity : wd.room_humidity,
+                     room_co2 : wd.room_co2,
+                     room_noise : wd.room_noise,
+                 })
+             } else {
+                None
+             };
+         self.home_group_table(ui,  "Дом", &home_data);
 
          ui.horizontal_centered(|ui| {
              let new_switch_state = self.bt_group(ui, "AEROPEX",
@@ -280,6 +304,12 @@ impl eframe::App for HomeDashboard {
 
          self.outdoor_group_table(ui, &self.state.weather_data);
          ui.end_row();
+         ui.add_visible(false, Separator::default());
+         ui.add_visible(false, Separator::default());
+         ui.add_visible(false, Separator::default());
+         self.home_group_table(ui,  "Переговорка", &self.state.office_room_data);
+         self.home_group_table(ui,  "Детская", &self.state.child_room_data);
+
          ui.end_row();
       });
 
