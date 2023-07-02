@@ -14,7 +14,7 @@ pub enum Preset {
     Unknown{ val_dc: u16, val_f0 : u16 },
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct DisplayState {
   pub brightness : u16,
   pub preset: Preset,
@@ -30,21 +30,26 @@ pub fn watch_ddc_display_loop(
     //display.update_capabilities().unwrap();
     log::info!("Found display {}", display_string(display));
 
+    let mut prev_ds : Option<DisplayState> = None;
+
     loop {
         let brightness = get_brightness(display)?;
         let preset = get_preset(display)?;
         log::info!("Brightness: {}, Preset {:?}", brightness, preset);
 
-        let ds = DisplayState{ brightness, preset };
-        match display_sender.try_send(ds) {
-            Ok(()) => (),
-            Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send display state, update_state_loop is not consuming it!"),
-            Err( TrySendError::Closed( _ ) ) => {
-                log::warn!("Failed to send display state - channel is closed. Probably update_state_loop is dead now. Exiting....");
-                break;
-            },
-        }
-        sleep(Duration::from_millis(2000));
+        let new_ds = DisplayState{ brightness, preset };
+        if prev_ds.is_none() || prev_ds.as_ref().unwrap() != &new_ds {
+            match display_sender.try_send( new_ds.clone() ) {
+                Ok(()) => (),
+                Err( TrySendError::Full( _ ) ) => log::warn!("Failed to send display state, update_state_loop is not consuming it!"),
+                Err( TrySendError::Closed( _ ) ) => {
+                    log::warn!("Failed to send display state - channel is closed. Probably update_state_loop is dead now. Exiting....");
+                    break;
+                },
+            }
+            prev_ds = Some( new_ds );
+        };
+        sleep(Duration::from_millis(1000));
     }
 
   log::warn!("watch_ddc_display_loop finsied");
