@@ -46,7 +46,7 @@ impl Texts {
  pub fn show_preset(&self, p : &Preset) -> String {
      match p {
          Preset::Standard => String::from(self.select("Стандартный", "Standard")),
-         Preset::Comfort => String::from(self.select("Комортный", "Comfort")),
+         Preset::Comfort => String::from(self.select("Комфортный", "Comfort")),
          Preset::Game => String::from(self.select("Игровой", "Game")),
          Preset::Movie => String::from(self.select("Просмотра фильма", "Movie")),
          Preset::Unknown{val_dc, val_f0} => format!("{} {:#x} {:#x}", self.select("Неизвесный", "Unknown"),  val_dc, val_f0),
