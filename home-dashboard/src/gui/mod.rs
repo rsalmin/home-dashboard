@@ -9,6 +9,7 @@ use std::path::Path;
 
 use crate::interface::*;
 use crate::worker::worker_thread;
+use crate::worker::ddc_display::DisplayState;
 
 mod images;
 use images::Images;
@@ -249,6 +250,49 @@ impl HomeDashboard {
     });
   }
 
+  fn display_group_table(&self, ui: &mut Ui, dd : &Option<DisplayState> ) {
+    let name_texts = vec![self.texts.brightness(), self.texts.preset()];
+
+    let mut data_texts = Vec::<String>::new();
+    if let Some( dd ) = dd {
+             data_texts.push( if let Some( br ) = dd.brightness { format!("{}", br) } else { String::new() } );
+             data_texts.push( if let Some( pr ) = &dd.preset { format!("{}", self.texts.show_preset(pr)) } else { String::new() } );
+    }
+
+    let title = "Дисплей";
+    let text_color = Color32::from_rgb(242, 174, 73);
+    let data_color = Color32::GREEN;
+    let title_color = Color32::from_rgb(105, 209, 203);
+
+    ui.push_id(title, |ui| {
+        ui.vertical_centered(|ui| {
+            ui.group(|ui| {
+                    ui.label( RichText::new(title).heading().color(title_color).size(20.0) );
+            });
+            let w = ui.available_width();
+            TableBuilder::new(ui)
+                .column( Column::exact(w/2.) )
+                .column( Column::exact(w/2.) )
+                .body(|body| {
+                    body.rows(60.0,  name_texts.len(), |row_index, mut row| {
+                        row.col(|ui| {
+                            ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                ui.label( RichText::new(name_texts[row_index]).heading().color(text_color).size(40.0) );
+                            });
+                        });
+                        if let Some( txt ) = data_texts.get(row_index) {
+                            row.col(|ui| {
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    ui.label( RichText::new(txt).heading().color(data_color).size(40.0) );
+                                 });
+                            });
+                       };
+                   });
+                });
+        });
+    });
+  }
+
   fn show_trend(&self, ui : &mut Ui, trend : &Trend)
   {
     let scale = 0.5;
@@ -328,6 +372,7 @@ impl eframe::App for HomeDashboard {
 
          self.outdoor_group_table(ui, &self.state.weather_data);
          self.bt_group(ui);
+         self.display_group_table(ui, &self.state.display_state);
          ui.end_row();
 
          ui.add_visible(false, Separator::default());

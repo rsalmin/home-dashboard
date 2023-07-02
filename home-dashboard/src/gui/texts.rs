@@ -1,3 +1,4 @@
+use crate::worker::ddc_display::Preset;
 
 #[derive(PartialEq)]
 pub enum Language {
@@ -32,6 +33,24 @@ impl Texts {
 
  pub fn pressure<'a>(&self) -> &'a str {
      self.select("Давление", "Pressure")
+ }
+
+ pub fn brightness<'a>(&self) -> &'a str {
+     self.select("Яркость", "Brightness")
+ }
+
+ pub fn preset<'a>(&self) -> &'a str {
+     self.select("Режим", "Preset")
+ }
+
+ pub fn show_preset(&self, p : &Preset) -> String {
+     match p {
+         Preset::Standard => String::from(self.select("Стандартный", "Standard")),
+         Preset::Comfort => String::from(self.select("Комортный", "Comfort")),
+         Preset::Game => String::from(self.select("Игровой", "Game")),
+         Preset::Movie => String::from(self.select("Просмотра фильма", "Movie")),
+         Preset::Unknown{val_dc, val_f0} => format!("{} {:#x} {:#x}", self.select("Неизвесный", "Unknown"),  val_dc, val_f0),
+     }
  }
 
  fn select<'a>(&self, t1 : &'a str, t2: &'a str) -> &'a str

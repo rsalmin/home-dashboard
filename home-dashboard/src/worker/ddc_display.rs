@@ -7,7 +7,7 @@ use std::time::Duration;
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Preset {
-    Standart,
+    Standard,
     Comfort,
     Movie,
     Game,
@@ -16,8 +16,8 @@ pub enum Preset {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DisplayState {
-  pub brightness : u16,
-  pub preset: Preset,
+  pub brightness : Option<u16>,
+  pub preset: Option<Preset>,
 }
 
 pub fn watch_ddc_display_loop(
@@ -33,9 +33,9 @@ pub fn watch_ddc_display_loop(
     let mut prev_ds : Option<DisplayState> = None;
 
     loop {
-        let brightness = get_brightness(display)?;
-        let preset = get_preset(display)?;
-        log::info!("Brightness: {}, Preset {:?}", brightness, preset);
+        let brightness = get_brightness(display);
+        let preset = get_preset(display);
+        log::info!("Brightness: {:?}, Preset {:?}", brightness, preset);
 
         let new_ds = DisplayState{ brightness, preset };
         if prev_ds.is_none() || prev_ds.as_ref().unwrap() != &new_ds {
@@ -56,11 +56,14 @@ pub fn watch_ddc_display_loop(
   Ok(())
 }
 
-fn get_brightness(display : &mut Display) -> Result<u16, String>
+fn get_brightness(display : &mut Display) -> Option<u16>
 {
     match display.handle.get_vcp_feature(0x10) {
-        Err( e ) => Err( e.to_string() ),
-        Ok( v ) => Ok( v.value() ),
+        Err( e ) => {
+            log::warn!("get_brightness error: {:?}", e);
+            None
+        }
+        Ok( v ) => Some( v.value() ),
     }
 }
 
@@ -69,25 +72,36 @@ fn set_brightness(display : &mut Display, val : u16) -> Result<(), String>
     display.handle.set_vcp_feature(0x10, val).map_err(|e| e.to_string())
 }
 
-fn get_preset(display : &mut Display) -> Result<Preset, String>
+fn get_preset(display : &mut Display) -> Option<Preset>
 {
-    let val_dc = display.handle.get_vcp_feature(0xDC).map_err(|e| e.to_string())?.value();
-    //let val_e2 = display.handle.get_vcp_feature(0xE2).map_err(|e| e.to_string())?.value();
-    let val_f0 = display.handle.get_vcp_feature(0xF0).map_err(|e| e.to_string())?.value();
-
-    Ok( match (val_dc, val_f0) {
-        (0, 0) => Preset::Standart,
-        (0, 0xC) => Preset::Comfort,
-        (3, 0) => Preset::Movie,
-        (5, 0) => Preset::Game,
-        (val_dc, val_f0) => Preset::Unknown{val_dc, val_f0},
-    })
+    match display.handle.get_vcp_feature(0xDC) {
+        Err( e ) => {
+            log::warn!("get_preset:get_vcp_feature 0xDC error: {:?}", e);
+            None
+        },
+        Ok( val_dc ) => {
+            match display.handle.get_vcp_feature(0xF0) {
+                Err( e ) => {
+                    log::warn!("get_preset:get_vcp_feature 0xF0 error: {:?}", e);
+                    None
+                },
+                Ok( val_f0 ) => Some (
+                    match (val_dc.value(), val_f0.value()) {
+                        (0, 0) => Preset::Standard,
+                        (0, 0xC) => Preset::Comfort,
+                        (3, 0) => Preset::Movie,
+                        (5, 0) => Preset::Game,
+                        (val_dc, val_f0) => Preset::Unknown{val_dc, val_f0},
+                    }),
+              }
+        },
+    }
 }
 
 fn set_preset(display : &mut Display, preset : Preset) -> Result<(), String>
 {
     match preset {
-        Preset::Standart => display.handle.set_vcp_feature(0xDC, 0).map_err(|e| e.to_string()),
+        Preset::Standard => display.handle.set_vcp_feature(0xDC, 0).map_err(|e| e.to_string()),
         Preset::Comfort  => display.handle.set_vcp_feature(0xF0, 0xC).map_err(|e| e.to_string()),
         Preset::Movie => display.handle.set_vcp_feature(0xDC, 3).map_err(|e| e.to_string()),
         Preset::Game => display.handle.set_vcp_feature(0xDC, 5).map_err(|e| e.to_string()),
