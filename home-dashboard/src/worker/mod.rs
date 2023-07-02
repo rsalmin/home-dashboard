@@ -4,11 +4,14 @@ use tokio::sync::mpsc::error::TrySendError;
 use tokio;
 use log;
 use crate::interface::*;
+use std::thread;
 
 mod bluetooth;
 mod netatmo;
+pub mod ddc_display;
 use bluetooth::*;
 use netatmo::*;
+use ddc_display::*;
 
 #[tokio::main]
 pub async fn worker_thread(sender : Sender<HomeState>, receiver : Receiver<HomeCommand>, ctx : Context, cfg : HomeDashboardConfig) {
@@ -25,11 +28,18 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
   const MAX_NUM_MESSAGES : usize = 5;
   let (bt_sender, bt_receiver) = channel::<BluetoothState>(MAX_NUM_MESSAGES);
   let (netatmo_sender, netatmo_receiver) = channel::<NetatmoData>(MAX_NUM_MESSAGES);
+  let (display_sender, display_receiver) = channel::<DisplayState>(MAX_NUM_MESSAGES);
 
-  let h1 = tokio::task::spawn( update_state_loop(sender, bt_receiver, netatmo_receiver, ctx) );
+  let h1 = tokio::task::spawn( update_state_loop(sender, bt_receiver, netatmo_receiver, display_receiver, ctx) );
   let h3 = tokio::task::spawn( watch_bluetooth_loop(bt_module.clone(), bt_sender) );
   let h2 = tokio::task::spawn( execute_command_loop(receiver, bt_module) );
   let h4 = tokio::task::spawn ( watch_netatmo_loop(netatmo_sender, cfg.connect_config.clone()) );
+  let h5 = thread::spawn( ||
+      {
+          if let Err( e ) = watch_ddc_display_loop(display_sender) {
+              log::error!("watch_ddc_display_loop finised with error: {}", e);
+          };
+       } );
 
   match h1.await {
     Err( e ) => log::warn!("update_state_loop task is faield... {:?}", e),
@@ -44,6 +54,9 @@ pub async fn worker_thread_prime(sender : Sender<HomeState>, receiver : Receiver
   if let Err( e ) = h4.await {
     log::warn!("watch_netatmo_loop task is faield... {:?}", e);
   }
+  if let Err( e ) = h5.join() {
+    log::warn!("watch_ddc_display_loop task is faield... {:?}", e);
+  }
 
   Ok(())
 }
@@ -52,6 +65,7 @@ async fn update_state_loop(
   sender : Sender<HomeState>,
   mut bt_receiver : Receiver<BluetoothState>,
   mut netatmo_receiver : Receiver<NetatmoData>,
+  mut display_receiver : Receiver<DisplayState>,
   egui_ctx : Context) -> Result<(), String>
 {
   let mut state = HomeState::default();
@@ -75,11 +89,13 @@ async fn update_state_loop(
           state.child_room_data = netatmo_data.child_room_data;
           state.office_room_data = netatmo_data.office_room_data;
       }
+      Some( display_state ) = display_receiver.recv() => {
+          state.display_state = Some( display_state );
+      }
      else => { break; }
     }
 
   }
-
 
   log::warn!("One of data streams is ended... strange... exiting...");
   Ok(())

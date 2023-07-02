@@ -1,6 +1,7 @@
 use serde::{Serialize, Deserialize};
 use netatmo_connect::ConnectConfig;
 use std::option::Option;
+use crate::worker::ddc_display::DisplayState;
 
 #[derive(Default, Debug, Clone)]
 pub struct HomeState {
@@ -8,6 +9,7 @@ pub struct HomeState {
   pub weather_data : Option<WeatherData>,
   pub child_room_data : Option<AirQualityData>,
   pub office_room_data : Option<AirQualityData>,
+  pub display_state : Option<DisplayState>,
 }
 
 #[derive(Default, Debug, Clone)]

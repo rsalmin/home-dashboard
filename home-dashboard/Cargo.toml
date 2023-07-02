@@ -19,3 +19,4 @@ netatmo-connect = { path = "../netatmo-connect" }
 serde = { version = "1.0.155", features = ["derive"] }
 reqwest = { version = "0.11", features = ["json"] }
 chrono = "0.4"
+ddc-hi = "0.4"
