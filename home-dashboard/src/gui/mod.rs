@@ -313,9 +313,7 @@ impl HomeDashboard {
 impl eframe::App for HomeDashboard {
   fn update(&mut self, ctx: &egui::Context, frame: &mut eframe::Frame) {
 
-    log::debug!("screen_rect {:?}", ctx.screen_rect());
-    log::debug!("available_rect {:?}", ctx.available_rect());
-    log::debug!("pixels_per_point {}", ctx.pixels_per_point());
+    log::debug!("screen_rect {:?} available_rect {:?} ", ctx.screen_rect(), ctx.available_rect());
 
     //ctx.set_debug_on_hover(true);
 

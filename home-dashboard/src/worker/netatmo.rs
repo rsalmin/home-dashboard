@@ -21,7 +21,8 @@ pub async fn watch_netatmo_loop(
   let client = reqwest::Client::new();
   let timeout = Some( Duration::from_secs(1) );
 
-  let mut token =  get_access_token(&client, &cfg, &timeout).await?;
+  //let mut token =  get_client_access_token(&client, &cfg, &timeout).await?;
+  let mut token =  authorize(&client, &cfg, &timeout).await?;
 
   loop {
     if token.expires_at < Instant::now() {
@@ -74,10 +75,10 @@ pub async fn watch_netatmo_loop(
     let res = get_homecoachs_data(&client, &token, &timeout).await?;
     for d in res.body.devices {
         if d.station_name == "Переговорка" {
-            netatmo_data.office_room_data = Some( from_dashboard_data( &d.dashboard_data ) );
+            netatmo_data.office_room_data = d.dashboard_data.as_ref().map( from_dashboard_data );
         }
         if d.station_name == "Детская" {
-            netatmo_data.child_room_data = Some( from_dashboard_data( &d.dashboard_data ) );
+            netatmo_data.child_room_data =  d.dashboard_data.as_ref().map( from_dashboard_data ) ;
         }
     }
 
